@@ -489,9 +489,19 @@
   color: var(--color-text);
 }
 
-.form-select {
+.form-input-small {
+  width: 80px;
   padding: 6px 8px;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+  text-align: right;
+}
+
+.form-input[aria-invalid='true'] {
+  border-color: var(--color-up);
+}
+
+.form-hint {
+  font-size: 0.8rem;
 }
 
 .form-presets {

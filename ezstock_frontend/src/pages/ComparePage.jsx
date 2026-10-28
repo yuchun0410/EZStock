@@ -16,10 +16,13 @@ const DEFAULT_STOCKS = [
 
 const CAPITAL_PRESETS = [100000, 500000, 1000000]
 
-const FEE_DISCOUNTS = [
-  { value: '1', label: '不打折' },
-  { value: '0.6', label: '6 折' },
-  { value: '0.28', label: '2.8 折' },
+// 手續費折扣用「折」輸入（6 = 6 折），跟券商的說法一樣；送給後端時再除以 10 變成 0.6
+const MIN_DISCOUNT = 1
+const MAX_DISCOUNT = 10
+const DISCOUNT_PRESETS = [
+  { value: '10', label: '不打折' },
+  { value: '6', label: '6 折' },
+  { value: '2.8', label: '2.8 折' },
 ]
 
 /** 標的比較：同一筆錢、同一天買進不同標的，一直抱到今天，誰比較好？ */
@@ -30,10 +33,14 @@ function ComparePage() {
   const [capital, setCapital] = useState('500000')
   const [reinvest, setReinvest] = useState(true)
   const [includeCosts, setIncludeCosts] = useState(true)
-  const [feeDiscount, setFeeDiscount] = useState('0.6')
+  const [feeDiscount, setFeeDiscount] = useState('6')
   const [state, setState] = useState({ status: 'idle', response: null, error: null, colors: {} })
 
-  const canSubmit = selected.length > 0 && startDate && Number(capital) >= 1000 && state.status !== 'loading'
+  const discountValue = Number(feeDiscount)
+  const discountValid =
+    !includeCosts || (feeDiscount !== '' && discountValue >= MIN_DISCOUNT && discountValue <= MAX_DISCOUNT)
+  const canSubmit =
+    selected.length > 0 && startDate && Number(capital) >= 1000 && discountValid && state.status !== 'loading'
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -46,7 +53,8 @@ function ComparePage() {
       initialCapital: Number(capital),
       reinvestDividends: reinvest,
       includeCosts,
-      feeDiscount: includeCosts ? Number(feeDiscount) : null,
+      // 6 折 → 0.6；四捨五入到小數 3 位，避免 2.8 / 10 變成 0.27999999999999997
+      feeDiscount: includeCosts ? Math.round((discountValue / 10) * 1000) / 1000 : null,
     }
     console.info('[標的比較] 送出', request)
     setState((current) => ({ ...current, status: 'loading', error: null }))
@@ -127,20 +135,35 @@ function ComparePage() {
               計算手續費
             </label>
             {includeCosts && (
-              <label className="form-check">
-                手續費折扣
-                <select
-                  className="form-input form-select"
-                  value={feeDiscount}
-                  onChange={(event) => setFeeDiscount(event.target.value)}
-                >
-                  {FEE_DISCOUNTS.map((d) => (
-                    <option key={d.value} value={d.value}>
+              <div className="form-field">
+                <label className="form-check">
+                  手續費
+                  <input
+                    type="number"
+                    className="form-input form-input-small"
+                    value={feeDiscount}
+                    min={MIN_DISCOUNT}
+                    max={MAX_DISCOUNT}
+                    step={0.1}
+                    inputMode="decimal"
+                    aria-invalid={!discountValid}
+                    onChange={(event) => setFeeDiscount(event.target.value)}
+                  />
+                  折
+                </label>
+                <span className="form-presets">
+                  {DISCOUNT_PRESETS.map((d) => (
+                    <button key={d.value} type="button" className="chip" onClick={() => setFeeDiscount(d.value)}>
                       {d.label}
-                    </option>
+                    </button>
                   ))}
-                </select>
-              </label>
+                </span>
+                {!discountValid && (
+                  <span className="error form-hint">
+                    請輸入 {MIN_DISCOUNT}～{MAX_DISCOUNT} 之間的數字（10 代表不打折）
+                  </span>
+                )}
+              </div>
             )}
           </div>
 
