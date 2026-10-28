@@ -43,3 +43,16 @@ export function toIsoDate(date) {
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
 }
+
+const moneyFormat = new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 0 })
+
+/** 1234567 → "1,234,567" */
+export function formatMoney(value) {
+  if (value == null) return '-'
+  return moneyFormat.format(Number(value))
+}
+
+/** 圖表座標軸用：1234567 → "123 萬" */
+export function formatTenThousands(value) {
+  return `${moneyFormat.format(Number(value) / 10000)} 萬`
+}

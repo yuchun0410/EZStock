@@ -30,3 +30,7 @@ export const MOVING_AVERAGES = [
   { period: 20, label: 'MA20', color: '#2563eb' },
   { period: 60, label: 'MA60', color: '#db2777' },
 ]
+
+// 標的比較：最多 5 檔，依「使用者選的順序」固定配色（顏色跟著標的走，不跟著排名走）。
+// 這組顏色用過配色檢查：明度、彩度、色盲模擬下相鄰兩色都分得開。
+export const SERIES_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4']
