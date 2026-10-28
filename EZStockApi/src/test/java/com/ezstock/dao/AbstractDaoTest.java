@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -19,7 +20,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * JPA 與 MyBatis 共用的測試案例。
  * 子類別用 ezstock.dao.type 決定要測哪一種實作。
  * 每個測試都在交易內執行，結束後自動回滾，不會留下測試資料。
+ *
+ * 注意：@Transactional 一定要放在「宣告測試方法的類別」上。
+ * Spring 判斷要不要開交易，是看方法宣告在哪個類別，
+ * 放在子類別上，父類別繼承下來的測試方法不會被包進交易。
  */
+@Transactional
 abstract class AbstractDaoTest {
 
     private static final String TEST_STOCK_ID = "TEST01";
