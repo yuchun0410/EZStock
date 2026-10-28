@@ -1,10 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { searchStocks } from '../api/stockApi'
 import WatchlistCard from '../components/WatchlistCard'
-
-// 停止打字多久才送出搜尋（毫秒）。每打一個字就打 API 太浪費。
-const SEARCH_DELAY_MS = 300
+import { useStockSearch } from '../hooks/useStockSearch'
 
 const POPULAR_STOCKS = [
   { stockId: '2330', name: '台積電' },
@@ -27,37 +24,15 @@ function HomePage() {
   // 這時只更新 input，等選完字（compositionend）才更新 query，避免拿注音去搜尋。
   const [input, setInput] = useState('')
   const [query, setQuery] = useState('')
-  const [result, setResult] = useState({ keyword: '', stocks: [], error: null })
   const keyword = query.trim()
-
-  useEffect(() => {
-    if (!keyword) return
-    // 防抖（debounce）：每次打字都先取消上一個計時器，停下來 300ms 才真的搜尋
-    let ignore = false
-    const timer = setTimeout(() => {
-      searchStocks(keyword)
-        .then((stocks) => {
-          if (!ignore) setResult({ keyword, stocks, error: null })
-        })
-        .catch((error) => {
-          if (!ignore) setResult({ keyword, stocks: [], error })
-        })
-    }, SEARCH_DELAY_MS)
-    return () => {
-      ignore = true
-      clearTimeout(timer)
-    }
-  }, [keyword])
-
-  const isCurrent = keyword !== '' && result.keyword === keyword
-  const loading = keyword !== '' && !isCurrent
+  const { stocks, error, loading, isCurrent } = useStockSearch(keyword)
 
   // 按 Enter：代號完全相符或只有一筆結果，就直接進個股頁
   function handleSubmit(event) {
     event.preventDefault()
     if (!isCurrent) return
-    const exact = result.stocks.find((stock) => stock.stockId === keyword)
-    const target = exact ?? (result.stocks.length === 1 ? result.stocks[0] : null)
+    const exact = stocks.find((stock) => stock.stockId === keyword)
+    const target = exact ?? (stocks.length === 1 ? stocks[0] : null)
     if (target) {
       navigate(`/stocks/${target.stockId}`)
     }
@@ -87,13 +62,13 @@ function HomePage() {
         </form>
 
         {loading && <p className="muted">搜尋中…</p>}
-        {isCurrent && result.error && <p className="error">{result.error.message}</p>}
-        {isCurrent && !result.error && result.stocks.length === 0 && (
+        {isCurrent && error && <p className="error">{error.message}</p>}
+        {isCurrent && !error && stocks.length === 0 && (
           <p className="muted">找不到符合「{keyword}」的股票</p>
         )}
-        {isCurrent && result.stocks.length > 0 && (
+        {isCurrent && stocks.length > 0 && (
           <ul className="search-results">
-            {result.stocks.map((stock) => (
+            {stocks.map((stock) => (
               <li key={stock.stockId}>
                 <Link to={`/stocks/${stock.stockId}`} className="search-result">
                   <span className="search-result-id">{stock.stockId}</span>
