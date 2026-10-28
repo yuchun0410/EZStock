@@ -10,6 +10,7 @@ import com.ezstock.exception.ResourceNotFoundException;
 import com.ezstock.model.DailyPrice;
 import com.ezstock.model.Stock;
 import com.ezstock.model.StockType;
+import com.ezstock.service.PriceLoader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -39,14 +42,16 @@ class StockQueryServiceImplTest {
 
     private StockDao stockDao;
     private DailyPriceDao dailyPriceDao;
+    private PriceLoader priceLoader;
     private StockQueryServiceImpl service;
 
     @BeforeEach
     void setUp() {
         stockDao = mock(StockDao.class);
         dailyPriceDao = mock(DailyPriceDao.class);
+        priceLoader = mock(PriceLoader.class);
         Clock clock = Clock.fixed(Instant.parse("2026-10-28T02:00:00Z"), ZoneId.of("Asia/Taipei"));
-        service = new StockQueryServiceImpl(stockDao, dailyPriceDao, clock);
+        service = new StockQueryServiceImpl(stockDao, dailyPriceDao, priceLoader, clock);
 
         when(stockDao.findById("2330")).thenReturn(Optional.of(tsmc));
         when(stockDao.findById("9999")).thenReturn(Optional.empty());
@@ -105,11 +110,27 @@ class StockQueryServiceImplTest {
     }
 
     @Test
-    @DisplayName("個股：查無股票丟出 ResourceNotFoundException")
+    @DisplayName("個股：查無股票丟出 ResourceNotFoundException，也不會去外部載入")
     void detailNotFound() {
         assertThatThrownBy(() -> service.getDetail("9999"))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("9999");
+        verify(priceLoader, never()).ensureLoaded(anyString());
+    }
+
+    @Test
+    @DisplayName("個股與日線：查詢價格之前，先確保價格已載入")
+    void ensureLoadedBeforeQuery() {
+        when(dailyPriceDao.findLatest("2330")).thenReturn(Optional.empty());
+
+        service.getDetail("2330");
+        service.getPrices("2330", null, null);
+
+        var order = inOrder(priceLoader, dailyPriceDao);
+        order.verify(priceLoader).ensureLoaded("2330");
+        order.verify(dailyPriceDao).findLatest("2330");
+        order.verify(priceLoader).ensureLoaded("2330");
+        order.verify(dailyPriceDao).findByStockAndDateRange("2330", TODAY.minusYears(1), TODAY);
     }
 
     @Test
