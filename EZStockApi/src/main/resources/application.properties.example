@@ -25,6 +25,8 @@ logging.level.org.hibernate.SQL=DEBUG
 logging.level.org.hibernate.orm.jdbc.bind=INFO
 # 同時寫進檔案，位置在 EZStockApi/logs/ezstock.log
 logging.file.name=logs/ezstock.log
+# 每行 log 加上請求編號 traceId（同一個請求的 log 編號相同）
+logging.pattern.correlation=[%X{traceId:-}] 
 
 # ---------- 匯入 ----------
 # 要匯入價格與股利的股票（股票清單一律匯入全部上市股票與 ETF）
