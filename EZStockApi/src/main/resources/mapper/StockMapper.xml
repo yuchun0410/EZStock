@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ezstock.dao.mybatis.mapper.StockMapper">
+
+    <resultMap id="stockMap" type="Stock">
+        <id     property="stockId"  column="stock_id"/>
+        <result property="name"     column="name"/>
+        <result property="type"     column="type"/>
+        <result property="industry" column="industry"/>
+    </resultMap>
+
+    <sql id="columns">stock_id, name, type, industry</sql>
+
+    <select id="findById" resultMap="stockMap">
+        SELECT <include refid="columns"/>
+        FROM stock
+        WHERE stock_id = #{stockId}
+    </select>
+
+    <select id="search" resultMap="stockMap">
+        SELECT <include refid="columns"/>
+        FROM stock
+        WHERE stock_id LIKE CONCAT('%', #{keyword}, '%')
+           OR name     LIKE CONCAT('%', #{keyword}, '%')
+        ORDER BY stock_id
+    </select>
+
+    <select id="findAll" resultMap="stockMap">
+        SELECT <include refid="columns"/>
+        FROM stock
+        ORDER BY stock_id
+    </select>
+
+    <!-- 不存在就新增，存在就更新 -->
+    <insert id="upsert">
+        INSERT INTO stock (stock_id, name, type, industry)
+        VALUES (#{stockId}, #{name}, #{type}, #{industry}) AS new
+        ON DUPLICATE KEY UPDATE
+            name     = new.name,
+            type     = new.type,
+            industry = new.industry
+    </insert>
+</mapper>

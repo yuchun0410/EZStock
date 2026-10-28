@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ezstock.dao.mybatis.mapper.DailyPriceMapper">
+
+    <!-- stock 只帶 stockId，不 JOIN stock 表，效果類似 JPA 的 LAZY -->
+    <resultMap id="dailyPriceMap" type="DailyPrice">
+        <id     property="id"         column="id"/>
+        <result property="tradeDate"  column="trade_date"/>
+        <result property="openPrice"  column="open_price"/>
+        <result property="highPrice"  column="high_price"/>
+        <result property="lowPrice"   column="low_price"/>
+        <result property="closePrice" column="close_price"/>
+        <result property="volume"     column="volume"/>
+        <association property="stock" javaType="Stock">
+            <id property="stockId" column="stock_id"/>
+        </association>
+    </resultMap>
+
+    <sql id="columns">
+        id, stock_id, trade_date, open_price, high_price, low_price, close_price, volume
+    </sql>
+
+    <select id="findByStockAndDateRange" resultMap="dailyPriceMap">
+        SELECT <include refid="columns"/>
+        FROM daily_price
+        WHERE stock_id = #{stockId}
+          AND trade_date BETWEEN #{from} AND #{to}
+        ORDER BY trade_date
+    </select>
+
+    <select id="findLatest" resultMap="dailyPriceMap">
+        SELECT <include refid="columns"/>
+        FROM daily_price
+        WHERE stock_id = #{stockId}
+        ORDER BY trade_date DESC
+        LIMIT 1
+    </select>
+
+    <select id="findTradeDates" resultType="java.time.LocalDate">
+        SELECT trade_date
+        FROM daily_price
+        WHERE stock_id = #{stockId}
+          AND trade_date BETWEEN #{from} AND #{to}
+    </select>
+
+    <!-- 一條 SQL 新增多筆：INSERT ... VALUES (...), (...), ... -->
+    <insert id="insertBatch">
+        INSERT INTO daily_price
+            (stock_id, trade_date, open_price, high_price, low_price, close_price, volume)
+        VALUES
+        <foreach collection="prices" item="p" separator=",">
+            (#{p.stock.stockId}, #{p.tradeDate}, #{p.openPrice}, #{p.highPrice},
+             #{p.lowPrice}, #{p.closePrice}, #{p.volume})
+        </foreach>
+    </insert>
+</mapper>

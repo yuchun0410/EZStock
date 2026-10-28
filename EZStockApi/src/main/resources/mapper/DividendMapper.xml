@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ezstock.dao.mybatis.mapper.DividendMapper">
+
+    <resultMap id="dividendMap" type="Dividend">
+        <id     property="id"           column="id"/>
+        <result property="exDate"       column="ex_date"/>
+        <result property="cashDividend" column="cash_dividend"/>
+        <association property="stock" javaType="Stock">
+            <id property="stockId" column="stock_id"/>
+        </association>
+    </resultMap>
+
+    <select id="findByStockAndDateRange" resultMap="dividendMap">
+        SELECT id, stock_id, ex_date, cash_dividend
+        FROM dividend
+        WHERE stock_id = #{stockId}
+          AND ex_date BETWEEN #{from} AND #{to}
+        ORDER BY ex_date
+    </select>
+
+    <insert id="insertBatch">
+        INSERT INTO dividend (stock_id, ex_date, cash_dividend)
+        VALUES
+        <foreach collection="dividends" item="d" separator=",">
+            (#{d.stock.stockId}, #{d.exDate}, #{d.cashDividend})
+        </foreach>
+    </insert>
+</mapper>
