@@ -8,11 +8,16 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+import java.util.stream.Collectors;
 
 /**
  * 把例外統一轉成 ApiError 回應。
@@ -59,6 +64,25 @@ public class GlobalExceptionHandler {
         String message = "參數 " + e.getName() + " 格式錯誤：" + e.getValue();
         log.warn("參數錯誤：{}", message);
         return build(HttpStatus.BAD_REQUEST, "BAD_REQUEST", message);
+    }
+
+    /** @Valid 檢查沒過：把每個欄位的錯誤訊息串起來，例如「請選擇起始日；投入金額至少 1,000 元」 */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException e) {
+        String message = e.getBindingResult().getFieldErrors().stream()
+                .map(FieldError::getDefaultMessage)
+                .distinct()
+                .collect(Collectors.joining("；"));
+        log.warn("參數錯誤：{}", message);
+        return build(HttpStatus.BAD_REQUEST, "BAD_REQUEST", message);
+    }
+
+    /** JSON 格式錯誤，或欄位型別不對（例如日期寫成 2026/01/01） */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiError> handleUnreadable(HttpMessageNotReadableException e) {
+        // 例外訊息可能包含類別名稱等內部資訊，只寫進 log，不回給前端
+        log.warn("參數錯誤：請求內容無法解析：{}", e.getMostSpecificCause().getMessage());
+        return build(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "請求內容格式錯誤，日期請用 yyyy-MM-dd");
     }
 
     @ExceptionHandler(FinMindApiException.class)

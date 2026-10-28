@@ -22,4 +22,8 @@ public record ImportResult(int stockListCount,
     public int totalDividendsInserted() {
         return succeeded.stream().mapToInt(StockImportResult::dividendsInserted).sum();
     }
+
+    public int totalSplitsInserted() {
+        return succeeded.stream().mapToInt(StockImportResult::splitsInserted).sum();
+    }
 }

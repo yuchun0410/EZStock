@@ -49,7 +49,7 @@ class OnDemandPriceLoaderTest {
     @DisplayName("沒有價格：呼叫匯入")
     void loadWhenMissing() {
         when(dailyPriceDao.findLatest("2308")).thenReturn(Optional.empty());
-        when(importService.importStock("2308")).thenReturn(new StockImportResult("2308", 1200, 0, 20, 0));
+        when(importService.importStock("2308")).thenReturn(new StockImportResult("2308", 1200, 0, 20, 0, 0));
 
         loader.ensureLoaded("2308");
 
@@ -60,7 +60,7 @@ class OnDemandPriceLoaderTest {
     @DisplayName("外部資料來源也沒有資料：記下來，之後不再重複呼叫")
     void noDataIsRemembered() {
         when(dailyPriceDao.findLatest("9999")).thenReturn(Optional.empty());
-        when(importService.importStock("9999")).thenReturn(new StockImportResult("9999", 0, 0, 0, 0));
+        when(importService.importStock("9999")).thenReturn(new StockImportResult("9999", 0, 0, 0, 0, 0));
 
         loader.ensureLoaded("9999");
         loader.ensureLoaded("9999");

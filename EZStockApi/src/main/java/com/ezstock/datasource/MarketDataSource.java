@@ -17,4 +17,7 @@ public interface MarketDataSource {
 
     /** 某檔股票某段期間的現金股利 */
     List<CashDividend> fetchCashDividends(String stockId, LocalDate from, LocalDate to);
+
+    /** 某檔股票某段期間的股票分割與面額變更（會讓股數改變的事件） */
+    List<ShareSplit> fetchShareSplits(String stockId, LocalDate from, LocalDate to);
 }

@@ -1,4 +1,4 @@
-import { Link } from 'react-router'
+import { Link, NavLink } from 'react-router'
 
 function Header() {
   return (
@@ -8,6 +8,14 @@ function Header() {
           EZ<span>Stock</span>
         </Link>
         <span className="tagline">台股查詢與回測</span>
+        <nav className="nav" aria-label="主選單">
+          <NavLink to="/" end className="nav-link">
+            查詢
+          </NavLink>
+          <NavLink to="/backtest/compare" className="nav-link">
+            標的比較
+          </NavLink>
+        </nav>
       </div>
     </header>
   )

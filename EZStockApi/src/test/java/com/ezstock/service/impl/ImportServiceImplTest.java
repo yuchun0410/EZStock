@@ -4,14 +4,18 @@ import com.ezstock.config.ImportProperties;
 import com.ezstock.dao.DailyPriceDao;
 import com.ezstock.dao.DividendDao;
 import com.ezstock.dao.StockDao;
+import com.ezstock.dao.StockSplitDao;
 import com.ezstock.datasource.CashDividend;
 import com.ezstock.datasource.MarketDataSource;
 import com.ezstock.datasource.PriceBar;
+import com.ezstock.datasource.ShareSplit;
 import com.ezstock.datasource.StockInfo;
 import com.ezstock.datasource.finmind.FinMindApiException;
 import com.ezstock.model.DailyPrice;
 import com.ezstock.model.Dividend;
+import com.ezstock.model.SplitType;
 import com.ezstock.model.Stock;
+import com.ezstock.model.StockSplit;
 import com.ezstock.model.StockType;
 import com.ezstock.service.ImportResult;
 import com.ezstock.service.StockImportResult;
@@ -53,10 +57,12 @@ class ImportServiceImplTest {
     private StockDao stockDao;
     private DailyPriceDao dailyPriceDao;
     private DividendDao dividendDao;
+    private StockSplitDao stockSplitDao;
 
     /** 記錄每次 insertAll 收到的資料，方便檢查到底新增了什麼 */
     private final List<DailyPrice> insertedPrices = new ArrayList<>();
     private final List<Dividend> insertedDividends = new ArrayList<>();
+    private final List<StockSplit> insertedSplits = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
@@ -64,6 +70,7 @@ class ImportServiceImplTest {
         stockDao = mock(StockDao.class);
         dailyPriceDao = mock(DailyPriceDao.class);
         dividendDao = mock(DividendDao.class);
+        stockSplitDao = mock(StockSplitDao.class);
 
         when(stockDao.findById(anyString())).thenAnswer(inv ->
                 Optional.of(new Stock(inv.getArgument(0), "測試", StockType.STOCK, "測試產業")));
@@ -71,6 +78,13 @@ class ImportServiceImplTest {
         when(dividendDao.findByStockAndDateRange(anyString(), any(), any())).thenReturn(List.of());
         when(dataSource.fetchPrices(anyString(), any(), any())).thenReturn(List.of());
         when(dataSource.fetchCashDividends(anyString(), any(), any())).thenReturn(List.of());
+        when(dataSource.fetchShareSplits(anyString(), any(), any())).thenReturn(List.of());
+        when(stockSplitDao.findByStockAndDateRange(anyString(), any(), any())).thenReturn(List.of());
+        when(stockSplitDao.insertAll(anyList())).thenAnswer(inv -> {
+            List<StockSplit> splits = inv.getArgument(0);
+            insertedSplits.addAll(splits);
+            return splits.size();
+        });
 
         when(dailyPriceDao.insertAll(anyList())).thenAnswer(inv -> {
             List<DailyPrice> prices = inv.getArgument(0);
@@ -86,7 +100,7 @@ class ImportServiceImplTest {
 
     private ImportServiceImpl createService(List<String> stockIds) {
         Clock clock = Clock.fixed(Instant.parse("2026-10-28T02:00:00Z"), ZoneId.of("Asia/Taipei"));
-        return new ImportServiceImpl(dataSource, stockDao, dailyPriceDao, dividendDao,
+        return new ImportServiceImpl(dataSource, stockDao, dailyPriceDao, dividendDao, stockSplitDao,
                 new ImportProperties(stockIds, 5, false),
                 mock(PlatformTransactionManager.class), clock);
     }
@@ -110,7 +124,39 @@ class ImportServiceImplTest {
 
         assertThat(insertedPrices).extracting(DailyPrice::getTradeDate).containsExactly(d2);
         assertThat(insertedDividends).isEmpty();
-        assertThat(result).isEqualTo(new StockImportResult("2330", 1, 1, 0, 1));
+        assertThat(result).isEqualTo(new StockImportResult("2330", 1, 1, 0, 1, 0));
+    }
+
+    @Test
+    @DisplayName("單檔匯入：股票分割也一起存，資料庫已經有的日期略過")
+    void importStockSavesSplits() {
+        LocalDate oldSplit = LocalDate.of(2023, 1, 10);
+        LocalDate newSplit = LocalDate.of(2025, 6, 18);
+        when(dataSource.fetchShareSplits(eq("0050"), any(), any())).thenReturn(List.of(
+                new ShareSplit("0050", oldSplit, SplitType.SPLIT, new BigDecimal("100"), new BigDecimal("50")),
+                new ShareSplit("0050", newSplit, SplitType.SPLIT, new BigDecimal("188.65"), new BigDecimal("47.16"))));
+        Stock etf = new Stock("0050", "元大台灣50", StockType.ETF, "ETF");
+        when(stockSplitDao.findByStockAndDateRange(eq("0050"), any(), any())).thenReturn(List.of(
+                new StockSplit(etf, oldSplit, SplitType.SPLIT, new BigDecimal("100"), new BigDecimal("50"))));
+
+        StockImportResult result = createService(List.of("0050")).importStock("0050");
+
+        assertThat(insertedSplits).extracting(StockSplit::getSplitDate).containsExactly(newSplit);
+        assertThat(result.splitsInserted()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("單檔匯入：股票分割抓取失敗時，價格和股利照樣匯入")
+    void importStockWhenSplitFetchFails() {
+        LocalDate d1 = LocalDate.of(2026, 10, 27);
+        when(dataSource.fetchPrices(eq("2330"), any(), any())).thenReturn(List.of(bar(d1)));
+        when(dataSource.fetchShareSplits(eq("2330"), any(), any()))
+                .thenThrow(new FinMindApiException("FinMind 呼叫失敗：HTTP 402"));
+
+        StockImportResult result = createService(List.of("2330")).importStock("2330");
+
+        assertThat(result.pricesInserted()).isEqualTo(1);
+        assertThat(result.splitsInserted()).isZero();
     }
 
     @Test
