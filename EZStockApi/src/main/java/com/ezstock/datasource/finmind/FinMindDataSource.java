@@ -117,6 +117,14 @@ public class FinMindDataSource implements MarketDataSource {
         return dividends;
     }
 
+    /** FinMind 的錯誤回應會帶 token 尾碼（token_tail），寫進 log 前先遮掉 */
+    static String maskToken(String responseBody) {
+        if (responseBody == null) {
+            return null;
+        }
+        return responseBody.replaceAll("\"token_tail\"\\s*:\\s*\"[^\"]*\"", "\"token_tail\":\"***\"");
+    }
+
     /**
      * 呼叫 FinMind 的共用方法：組參數、帶 token、記錄耗時、檢查狀態。
      * 注意：log 不可以印出 token。
@@ -151,7 +159,7 @@ public class FinMindDataSource implements MarketDataSource {
                     .body(responseType);
         } catch (RestClientResponseException e) {
             log.error("[FinMind] 呼叫失敗 dataset={} dataId={} HTTP {} 回應：{}",
-                    dataset, dataId, e.getStatusCode().value(), e.getResponseBodyAsString());
+                    dataset, dataId, e.getStatusCode().value(), maskToken(e.getResponseBodyAsString()));
             throw new FinMindApiException("FinMind 呼叫失敗：HTTP " + e.getStatusCode().value(), e);
         } catch (RestClientException e) {
             log.error("[FinMind] 無法連線 dataset={} dataId={}：{}", dataset, dataId, e.getMessage());

@@ -117,6 +117,26 @@ class FinMindDataSourceTest {
     }
 
     @Test
+    @DisplayName("token：沒填、佔位文字、含非英數字元都當作沒有 token")
+    void hasToken() {
+        assertThat(new FinMindProperties(URL, null).hasToken()).isFalse();
+        assertThat(new FinMindProperties(URL, "").hasToken()).isFalse();
+        assertThat(new FinMindProperties(URL, "YOUR_FINMIND_TOKEN").hasToken()).isFalse();
+        assertThat(new FinMindProperties(URL, "之後填入").hasToken()).isFalse();
+        assertThat(new FinMindProperties(URL, "eyJhbGciOi.eyJ1c2VyX2lk.abc-123_XYZ").hasToken()).isTrue();
+    }
+
+    @Test
+    @DisplayName("錯誤回應寫進 log 前，會遮掉 token 尾碼")
+    void maskToken() {
+        String body = "{\"msg\":\"Token is illegal.\",\"status\":400,\"token_tail\":\"...abc123\"}";
+
+        assertThat(FinMindDataSource.maskToken(body))
+                .doesNotContain("abc123")
+                .contains("\"token_tail\":\"***\"");
+    }
+
+    @Test
     @DisplayName("超過用量（HTTP 402）時丟出 FinMindApiException")
     void overLimit() {
         setUp("my-token");
