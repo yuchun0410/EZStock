@@ -2,6 +2,7 @@ package com.ezstock.exception;
 
 import com.ezstock.config.RequestLoggingFilter;
 import com.ezstock.datasource.finmind.FinMindApiException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * 把例外統一轉成 ApiError 回應。
@@ -26,6 +28,17 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleNotFound(ResourceNotFoundException e) {
         log.warn("查無資料：{}", e.getMessage());
         return build(HttpStatus.NOT_FOUND, "NOT_FOUND", e.getMessage());
+    }
+
+    /**
+     * 網址打錯（或瀏覽器自動要 /favicon.ico）時，Spring 會丟 NoResourceFoundException。
+     * 這是使用者端的錯誤，回 404 並記 WARN，不能被下面的 Exception 接走變成 500 + ERROR 堆疊。
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiError> handleNoResource(NoResourceFoundException e, HttpServletRequest request) {
+        String message = "找不到 " + request.getRequestURI();
+        log.warn("查無路徑：{} {}", request.getMethod(), request.getRequestURI());
+        return build(HttpStatus.NOT_FOUND, "NOT_FOUND", message);
     }
 
     @ExceptionHandler(BadRequestException.class)
