@@ -87,3 +87,81 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- 首頁搜尋 ---------- */
+.search-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  outline: none;
+}
+
+.search-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(31, 58, 95, 0.15);
+}
+
+.search-results {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.search-result {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--color-border);
+  text-decoration: none;
+}
+
+.search-result:hover {
+  background: var(--color-bg);
+}
+
+.search-result-id {
+  min-width: 56px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.search-result-name {
+  flex: 1;
+}
+
+.section-title {
+  margin: 0 0 12px;
+  font-size: 1.125rem;
+}
+
+.popular {
+  margin-top: 16px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.chip:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
