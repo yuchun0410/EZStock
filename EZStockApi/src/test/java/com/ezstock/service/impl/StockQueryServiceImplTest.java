@@ -59,16 +59,17 @@ class StockQueryServiceImplTest {
     }
 
     @Test
-    @DisplayName("搜尋：去掉前後空白，最多回傳 20 筆")
+    @DisplayName("搜尋：去掉前後空白，請 DAO 最多取 20 筆")
     void searchLimit() {
-        List<Stock> many = new ArrayList<>();
-        for (int i = 0; i < 30; i++) {
-            many.add(new Stock(String.valueOf(2000 + i), "測試" + i, StockType.STOCK, "測試"));
+        List<Stock> found = new ArrayList<>();
+        for (int i = 0; i < StockQueryServiceImpl.SEARCH_LIMIT; i++) {
+            found.add(new Stock(String.valueOf(2000 + i), "測試" + i, StockType.STOCK, "測試"));
         }
-        when(stockDao.search("2")).thenReturn(many);
+        when(stockDao.search("2", StockQueryServiceImpl.SEARCH_LIMIT)).thenReturn(found);
 
         List<StockSummary> result = service.search("  2  ");
 
+        verify(stockDao).search("2", StockQueryServiceImpl.SEARCH_LIMIT);
         assertThat(result).hasSize(StockQueryServiceImpl.SEARCH_LIMIT);
         assertThat(result.get(0).stockId()).isEqualTo("2000");
     }

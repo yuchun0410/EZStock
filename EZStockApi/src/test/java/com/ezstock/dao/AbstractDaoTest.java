@@ -54,7 +54,7 @@ abstract class AbstractDaoTest {
                 .isPresent()
                 .get().extracting(Stock::getName).isEqualTo("測試股票");
 
-        assertThat(stockDao.search("測試股"))
+        assertThat(stockDao.search("測試股", 20))
                 .extracting(Stock::getStockId)
                 .contains(TEST_STOCK_ID);
 
@@ -62,6 +62,16 @@ abstract class AbstractDaoTest {
         Stock updated = stockDao.findById(TEST_STOCK_ID).orElseThrow();
         assertThat(updated.getName()).isEqualTo("改名後");
         assertThat(updated.getType()).isEqualTo(StockType.ETF);
+    }
+
+    @Test
+    @DisplayName("股票：搜尋筆數由資料庫限制，依代號排序")
+    void searchLimit() {
+        stockDao.save(new Stock("TEST02", "測試股票二", StockType.STOCK, "測試產業"));
+
+        assertThat(stockDao.search("測試股票", 1))
+                .extracting(Stock::getStockId)
+                .containsExactly(TEST_STOCK_ID);
     }
 
     @Test
