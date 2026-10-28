@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { searchStocks } from '../api/stockApi'
+import WatchlistCard from '../components/WatchlistCard'
 
 // 停止打字多久才送出搜尋（毫秒）。每打一個字就打 API 太浪費。
 const SEARCH_DELAY_MS = 300
@@ -107,6 +108,8 @@ function HomePage() {
           </ul>
         )}
       </section>
+
+      {!keyword && <WatchlistCard />}
 
       {!keyword && (
         <section className="card popular">

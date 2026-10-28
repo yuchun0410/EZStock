@@ -3,6 +3,7 @@ import { useParams } from 'react-router'
 import { getStock } from '../api/stockApi'
 import DividendSection from '../components/DividendSection'
 import PriceSection from '../components/PriceSection'
+import WatchButton from '../components/WatchButton'
 import { formatPrice, formatSigned, trendClass } from '../utils/format'
 
 const TYPE_LABELS = { STOCK: '股票', ETF: 'ETF' }
@@ -46,9 +47,12 @@ function StockPage() {
   return (
     <>
       <section className="card">
-        <h2 className="stock-title">
-          {detail.stockId} {detail.name}
-        </h2>
+        <div className="stock-heading">
+          <h2 className="stock-title">
+            {detail.stockId} {detail.name}
+          </h2>
+          <WatchButton stock={detail} />
+        </div>
         <p className="stock-meta muted">
           {TYPE_LABELS[detail.type] ?? detail.type}
           {detail.industry && ` · ${detail.industry}`}
