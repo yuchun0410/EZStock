@@ -17,16 +17,30 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiGet(path, params = {}) {
-  const url = buildUrl(path, params)
+export function apiGet(path, params = {}) {
+  return request('GET', buildUrl(path, params))
+}
+
+/** 送出 JSON。body 會轉成 JSON 字串，Content-Type 設成 application/json */
+export function apiPost(path, payload) {
+  return request('POST', path, payload)
+}
+
+async function request(method, url, payload) {
   // 網址裡的中文會被編碼成 %E5%8F%B0...，log 顯示解碼後的版本比較好讀
-  const label = `GET ${decodeURIComponent(url)}`
+  const label = `${method} ${decodeURIComponent(url)}`
   const start = performance.now()
   console.info(`[API] --> ${label}`)
 
+  const options = { method, headers: { Accept: 'application/json' } }
+  if (payload !== undefined) {
+    options.headers['Content-Type'] = 'application/json'
+    options.body = JSON.stringify(payload)
+  }
+
   let response
   try {
-    response = await fetch(url, { headers: { Accept: 'application/json' } })
+    response = await fetch(url, options)
   } catch (error) {
     // 網路斷線、伺服器沒開，fetch 本身就會失敗，拿不到狀態碼
     console.error(`[API] 連線失敗 ${label}`, error)
