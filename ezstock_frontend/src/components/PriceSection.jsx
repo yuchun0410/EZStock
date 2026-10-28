@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { getPrices } from '../api/stockApi'
-import { toChartPoints, toWeekly } from '../utils/chartData'
+import { toChartPoints, toWeekly, withMovingAverages } from '../utils/chartData'
 import { formatSigned, minusMonths, trendClass } from '../utils/format'
+import { MOVING_AVERAGES } from './chartConfig'
 import PriceChart from './PriceChart'
 import VolumeChart from './VolumeChart'
 
@@ -21,19 +22,26 @@ const MODES = [
 // 超過這個月數，K 線改用週 K
 const WEEKLY_FROM_MONTHS = 60
 
+// 均線要往前多抓資料，期間第一天才算得出 MA60：
+// 日線 60 根約 3 個月，多抓 4 個月；週線 60 根約 14 個月，多抓 15 個月
+const MA_BUFFER_MONTHS = { daily: 4, weekly: 15 }
+
 /** 個股頁的走勢區塊：期間與圖形切換 + 期間漲跌 + 價格圖 + 成交量 */
 function PriceSection({ stockId, latestDate }) {
   const [rangeKey, setRangeKey] = useState('1Y')
   const [mode, setMode] = useState('line')
+  const [maPeriods, setMaPeriods] = useState([20, 60])
   const range = RANGES.find((r) => r.key === rangeKey)
+  const weekly = mode === 'candle' && range.months >= WEEKLY_FROM_MONTHS
   const from = minusMonths(latestDate, range.months)
+  const fetchFrom = minusMonths(latestDate, range.months + MA_BUFFER_MONTHS[weekly ? 'weekly' : 'daily'])
   // 用「股票 + 期間」當作這份資料的身分，切換期間時就知道目前的資料過期了
-  const requestKey = `${stockId}|${from}|${latestDate}`
+  const requestKey = `${stockId}|${fetchFrom}|${latestDate}`
   const [result, setResult] = useState({ requestKey: null, prices: [], error: null })
 
   useEffect(() => {
     let ignore = false
-    getPrices(stockId, from, latestDate)
+    getPrices(stockId, fetchFrom, latestDate)
       .then((prices) => {
         if (!ignore) setResult({ requestKey, prices, error: null })
       })
@@ -43,13 +51,21 @@ function PriceSection({ stockId, latestDate }) {
     return () => {
       ignore = true
     }
-  }, [stockId, from, latestDate, requestKey])
+  }, [stockId, fetchFrom, latestDate, requestKey])
 
   const loading = result.requestKey !== requestKey
   const daily = toChartPoints(result.prices)
-  const weekly = mode === 'candle' && range.months >= WEEKLY_FROM_MONTHS
-  const points = weekly ? toWeekly(daily) : daily
-  const periodChange = daily.length >= 2 ? periodReturn(daily) : null
+  const series = withMovingAverages(weekly ? toWeekly(daily) : daily, MOVING_AVERAGES.map((ma) => ma.period))
+  // 均線用完整資料算好之後，才切出要顯示的期間
+  const points = series.filter((p) => p.date >= from)
+  const visibleDaily = daily.filter((p) => p.date >= from)
+  const periodChange = visibleDaily.length >= 2 ? periodReturn(visibleDaily) : null
+
+  function toggleMa(period) {
+    setMaPeriods((current) =>
+      current.includes(period) ? current.filter((p) => p !== period) : [...current, period],
+    )
+  }
 
   return (
     <section className="card price-section">
@@ -57,6 +73,15 @@ function PriceSection({ stockId, latestDate }) {
         <div className="toolbar">
           <SegmentedControl label="走勢期間" options={RANGES} value={rangeKey} onChange={setRangeKey} />
           <SegmentedControl label="圖形" options={MODES} value={mode} onChange={setMode} />
+        </div>
+        <div className="ma-toggles" aria-label="均線">
+          {MOVING_AVERAGES.map((ma) => (
+            <label key={ma.period} className="ma-toggle">
+              <input type="checkbox" checked={maPeriods.includes(ma.period)} onChange={() => toggleMa(ma.period)} />
+              <span className="legend-swatch" style={{ background: ma.color }} />
+              {weekly ? `${ma.period} 週` : ma.label}
+            </label>
+          ))}
         </div>
         {!loading && periodChange != null && (
           <span className={`period-change ${trendClass(periodChange)}`}>
@@ -78,9 +103,10 @@ function PriceSection({ stockId, latestDate }) {
             trend={trendClass(periodChange)}
             longRange={range.months >= 12}
             weekly={weekly}
+            maPeriods={maPeriods}
           />
           <VolumeChart points={points} />
-          {weekly && <p className="chart-caption muted">5 年期間的 K 線以週 K 顯示</p>}
+          {weekly && <p className="chart-caption muted">5 年期間的 K 線以週 K 顯示，均線也改用週線計算</p>}
         </>
       )}
     </section>

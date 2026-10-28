@@ -23,3 +23,10 @@ export function candleColor(point) {
   if (point.close < point.open) return CHART_COLORS.down
   return CHART_COLORS.flat
 }
+
+// 均線：顏色用過配色檢查（色盲模擬下也分得開），且避開代表漲跌的紅綠
+export const MOVING_AVERAGES = [
+  { period: 5, label: 'MA5', color: '#b87800' },
+  { period: 20, label: 'MA20', color: '#2563eb' },
+  { period: 60, label: 'MA60', color: '#db2777' },
+]

@@ -9,14 +9,14 @@ import {
   YAxis,
 } from 'recharts'
 import { formatPrice } from '../utils/format'
-import { CHART_COLORS, CHART_SYNC_ID, Y_AXIS_WIDTH, candleColor } from './chartConfig'
+import { CHART_COLORS, CHART_SYNC_ID, MOVING_AVERAGES, Y_AXIS_WIDTH, candleColor } from './chartConfig'
 import PriceTooltip from './PriceTooltip'
 
 /**
  * 價格走勢圖：mode = 'line' 畫收盤價折線，mode = 'candle' 畫 K 線。
  * 折線的顏色跟著「這段期間」的漲跌：期間上漲紅色、下跌綠色。
  */
-function PriceChart({ points, mode, trend, longRange, weekly }) {
+function PriceChart({ points, mode, trend, longRange, weekly, maPeriods }) {
   const lineColor = CHART_COLORS[trend] ?? CHART_COLORS.neutral
 
   return (
@@ -46,7 +46,7 @@ function PriceChart({ points, mode, trend, longRange, weekly }) {
             axisLine={false}
           />
           <Tooltip
-            content={<PriceTooltip weekly={weekly} />}
+            content={<PriceTooltip weekly={weekly} maPeriods={maPeriods} />}
             cursor={{ stroke: CHART_COLORS.axis, strokeDasharray: '4 4' }}
             isAnimationActive={false}
           />
@@ -63,6 +63,19 @@ function PriceChart({ points, mode, trend, longRange, weekly }) {
               isAnimationActive={false}
             />
           )}
+          {MOVING_AVERAGES.filter((ma) => maPeriods.includes(ma.period)).map((ma) => (
+            <Line
+              key={ma.period}
+              type="monotone"
+              dataKey={`ma${ma.period}`}
+              stroke={ma.color}
+              strokeWidth={1.5}
+              dot={false}
+              activeDot={false}
+              connectNulls={false}
+              isAnimationActive={false}
+            />
+          ))}
         </ComposedChart>
       </ResponsiveContainer>
     </div>

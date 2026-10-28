@@ -55,3 +55,25 @@ function mondayOf(isoDate) {
   date.setDate(date.getDate() - offset)
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
+
+/**
+ * 加上移動平均線（均線）：maN = 最近 N 根收盤價的平均。
+ * 前面不滿 N 根的資料沒有均線，給 null（圖上就不畫）。
+ * 用「滑動視窗」累加：加上新的一根、減掉 N 根前的那根，每一點都是 O(1)，不用每次重算 N 筆。
+ */
+export function withMovingAverages(points, periods) {
+  const sums = Object.fromEntries(periods.map((n) => [n, 0]))
+  return points.map((point, i) => {
+    const result = { ...point }
+    for (const n of periods) {
+      sums[n] += point.close
+      if (i >= n) sums[n] -= points[i - n].close
+      result[`ma${n}`] = i >= n - 1 ? round2(sums[n] / n) : null
+    }
+    return result
+  })
+}
+
+function round2(value) {
+  return Math.round(value * 100) / 100
+}
