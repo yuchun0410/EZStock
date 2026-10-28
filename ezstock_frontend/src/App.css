@@ -165,3 +165,69 @@
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
+
+/* ---------- 走勢圖 ---------- */
+.price-section {
+  margin-top: 16px;
+}
+
+.price-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.range-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--color-bg);
+  border-radius: 8px;
+}
+
+.range-tab {
+  border: none;
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.range-tab.active {
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.period-change {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-placeholder {
+  height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-tooltip {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.875rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-tooltip-date {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
