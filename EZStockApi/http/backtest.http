@@ -1,0 +1,43 @@
+### 標的比較：2022 年初各投入 50 萬，股利再投入、手續費 6 折
+POST http://localhost:8080/api/backtests/compare
+Content-Type: application/json
+
+{
+  "stockIds": ["2330", "0050", "00878"],
+  "startDate": "2022-01-03",
+  "initialCapital": 500000,
+  "reinvestDividends": true,
+  "includeCosts": true,
+  "feeDiscount": 0.6
+}
+
+### 標的比較：股利不再投入、不計成本（跟上面比較差多少）
+POST http://localhost:8080/api/backtests/compare
+Content-Type: application/json
+
+{
+  "stockIds": ["2330", "0050", "00878"],
+  "startDate": "2022-01-03",
+  "initialCapital": 500000,
+  "reinvestDividends": false,
+  "includeCosts": false
+}
+
+### 錯誤：欄位驗證沒過（應該回 400，列出 3 個錯誤）
+POST http://localhost:8080/api/backtests/compare
+Content-Type: application/json
+
+{
+  "stockIds": [],
+  "initialCapital": 10
+}
+
+### 錯誤：查無股票（應該回 404）
+POST http://localhost:8080/api/backtests/compare
+Content-Type: application/json
+
+{
+  "stockIds": ["9999"],
+  "startDate": "2022-01-03",
+  "initialCapital": 500000
+}
