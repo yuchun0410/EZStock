@@ -3,6 +3,7 @@ package com.ezstock.service.impl;
 import com.ezstock.dao.DailyPriceDao;
 import com.ezstock.dao.DividendDao;
 import com.ezstock.dao.StockDao;
+import com.ezstock.dao.StockSplitDao;
 import com.ezstock.dto.CompareRequest;
 import com.ezstock.dto.CompareResponse;
 import com.ezstock.exception.BadRequestException;
@@ -45,6 +46,7 @@ class BacktestServiceImplTest {
     private StockDao stockDao;
     private DailyPriceDao dailyPriceDao;
     private DividendDao dividendDao;
+    private StockSplitDao stockSplitDao;
     private PriceLoader priceLoader;
     private BacktestServiceImpl service;
 
@@ -53,9 +55,10 @@ class BacktestServiceImplTest {
         stockDao = mock(StockDao.class);
         dailyPriceDao = mock(DailyPriceDao.class);
         dividendDao = mock(DividendDao.class);
+        stockSplitDao = mock(StockSplitDao.class);
         priceLoader = mock(PriceLoader.class);
         Clock clock = Clock.fixed(Instant.parse("2026-10-28T02:00:00Z"), ZoneId.of("Asia/Taipei"));
-        service = new BacktestServiceImpl(stockDao, dailyPriceDao, dividendDao, priceLoader, clock);
+        service = new BacktestServiceImpl(stockDao, dailyPriceDao, dividendDao, stockSplitDao, priceLoader, clock);
 
         when(stockDao.findById("AAAA")).thenReturn(Optional.of(a));
         when(stockDao.findById("BBBB")).thenReturn(Optional.of(b));
@@ -65,6 +68,7 @@ class BacktestServiceImplTest {
         when(dailyPriceDao.findByStockAndDateRange("BBBB", START, TODAY))
                 .thenReturn(List.of(price(b, START, "50"), price(b, START.plusDays(1), "45")));
         when(dividendDao.findByStockAndDateRange(anyString(), any(), any())).thenReturn(List.of());
+        when(stockSplitDao.findByStockAndDateRange(anyString(), any(), any())).thenReturn(List.of());
     }
 
     @Test
