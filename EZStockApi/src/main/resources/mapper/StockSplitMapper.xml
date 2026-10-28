@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ezstock.dao.mybatis.mapper.StockSplitMapper">
+
+    <resultMap id="stockSplitMap" type="StockSplit">
+        <id     property="id"          column="id"/>
+        <result property="splitDate"   column="split_date"/>
+        <result property="splitType"   column="split_type"/>
+        <result property="beforePrice" column="before_price"/>
+        <result property="afterPrice"  column="after_price"/>
+        <association property="stock" javaType="Stock">
+            <id property="stockId" column="stock_id"/>
+        </association>
+    </resultMap>
+
+    <select id="findByStockAndDateRange" resultMap="stockSplitMap">
+        SELECT id, stock_id, split_date, split_type, before_price, after_price
+        FROM stock_split
+        WHERE stock_id = #{stockId}
+          AND split_date BETWEEN #{from} AND #{to}
+        ORDER BY split_date
+    </select>
+
+    <insert id="insertBatch">
+        INSERT INTO stock_split (stock_id, split_date, split_type, before_price, after_price)
+        VALUES
+        <foreach collection="splits" item="s" separator=",">
+            (#{s.stock.stockId}, #{s.splitDate}, #{s.splitType}, #{s.beforePrice}, #{s.afterPrice})
+        </foreach>
+    </insert>
+</mapper>
