@@ -19,15 +19,17 @@ export class ApiError extends Error {
 
 export async function apiGet(path, params = {}) {
   const url = buildUrl(path, params)
+  // 網址裡的中文會被編碼成 %E5%8F%B0...，log 顯示解碼後的版本比較好讀
+  const label = `GET ${decodeURIComponent(url)}`
   const start = performance.now()
-  console.info(`[API] --> GET ${url}`)
+  console.info(`[API] --> ${label}`)
 
   let response
   try {
     response = await fetch(url, { headers: { Accept: 'application/json' } })
   } catch (error) {
     // 網路斷線、伺服器沒開，fetch 本身就會失敗，拿不到狀態碼
-    console.error(`[API] 連線失敗 GET ${url}`, error)
+    console.error(`[API] 連線失敗 ${label}`, error)
     throw new ApiError('無法連線到伺服器，請稍後再試', 0, null)
   }
 
@@ -39,11 +41,11 @@ export async function apiGet(path, params = {}) {
     // 後端的 GlobalExceptionHandler 會回 { status, error, message, traceId }
     // 沒有 body 通常代表後端沒開（開發時 Vite 代理會直接回 500）
     const message = body?.message ?? '無法連線到伺服器，請稍後再試'
-    console.warn(`[API] <-- ${response.status} GET ${url} ${elapsed} ms traceId=${traceId}：${message}`)
+    console.warn(`[API] <-- ${response.status} ${label} ${elapsed} ms traceId=${traceId}：${message}`)
     throw new ApiError(message, response.status, traceId ?? body?.traceId ?? null)
   }
 
-  console.info(`[API] <-- ${response.status} GET ${url} ${elapsed} ms traceId=${traceId}`)
+  console.info(`[API] <-- ${response.status} ${label} ${elapsed} ms traceId=${traceId}`)
   return body
 }
 
