@@ -6,6 +6,7 @@ import com.ezstock.repository.StockRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,10 +36,10 @@ public class StockJpaDao implements StockDao {
     }
 
     @Override
-    public List<Stock> search(String keyword) {
-        log.debug("[JPA] 搜尋股票 keyword={}", keyword);
+    public List<Stock> search(String keyword, int limit) {
+        log.debug("[JPA] 搜尋股票 keyword={} limit={}", keyword, limit);
         List<Stock> result = stockRepository
-                .findByStockIdContainingOrNameContainingOrderByStockIdAsc(keyword, keyword);
+                .findByStockIdContainingOrNameContainingOrderByStockIdAsc(keyword, keyword, Limit.of(limit));
         log.debug("[JPA] 搜尋股票 keyword={} 共 {} 筆", keyword, result.size());
         return result;
     }

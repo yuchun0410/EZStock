@@ -13,8 +13,8 @@ public interface StockDao {
 
     Optional<Stock> findById(String stockId);
 
-    /** 依代號或名稱模糊搜尋 */
-    List<Stock> search(String keyword);
+    /** 依代號或名稱模糊搜尋，依代號排序，最多回傳 limit 筆（由資料庫 LIMIT，不在 Java 裡截斷） */
+    List<Stock> search(String keyword, int limit);
 
     List<Stock> findAll();
 

@@ -57,8 +57,7 @@ public class StockQueryServiceImpl implements StockQueryService {
             throw new BadRequestException("請輸入股票代號或名稱");
         }
         String trimmed = keyword.trim();
-        List<StockSummary> result = stockDao.search(trimmed).stream()
-                .limit(SEARCH_LIMIT)
+        List<StockSummary> result = stockDao.search(trimmed, SEARCH_LIMIT).stream()
                 .map(StockSummary::from)
                 .toList();
         log.info("搜尋股票 keyword={} 回傳 {} 筆", trimmed, result.size());

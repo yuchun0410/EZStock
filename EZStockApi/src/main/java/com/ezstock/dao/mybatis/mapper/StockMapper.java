@@ -11,7 +11,7 @@ public interface StockMapper {
 
     Stock findById(@Param("stockId") String stockId);
 
-    List<Stock> search(@Param("keyword") String keyword);
+    List<Stock> search(@Param("keyword") String keyword, @Param("limit") int limit);
 
     List<Stock> findAll();
 

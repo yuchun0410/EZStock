@@ -24,6 +24,7 @@
         WHERE stock_id LIKE CONCAT('%', #{keyword}, '%')
            OR name     LIKE CONCAT('%', #{keyword}, '%')
         ORDER BY stock_id
+        LIMIT #{limit}
     </select>
 
     <select id="findAll" resultMap="stockMap">

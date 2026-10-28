@@ -34,9 +34,9 @@ public class StockMyBatisDao implements StockDao {
     }
 
     @Override
-    public List<Stock> search(String keyword) {
-        log.debug("[MyBatis] 搜尋股票 keyword={}", keyword);
-        List<Stock> result = stockMapper.search(keyword);
+    public List<Stock> search(String keyword, int limit) {
+        log.debug("[MyBatis] 搜尋股票 keyword={} limit={}", keyword, limit);
+        List<Stock> result = stockMapper.search(keyword, limit);
         log.debug("[MyBatis] 搜尋股票 keyword={} 共 {} 筆", keyword, result.size());
         return result;
     }
