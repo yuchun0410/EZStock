@@ -1,9 +1,22 @@
+import { Route, Routes } from 'react-router'
+import Header from './components/Header'
+import HomePage from './pages/HomePage'
+import StockPage from './pages/StockPage'
+import NotFoundPage from './pages/NotFoundPage'
+import './App.css'
+
 function App() {
   return (
-    <main style={{ maxWidth: 960, margin: '0 auto', padding: '24px 16px' }}>
-      <h1>EZStock</h1>
-      <p>台股查詢與回測</p>
-    </main>
+    <>
+      <Header />
+      <main className="container">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/stocks/:stockId" element={<StockPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </main>
+    </>
   )
 }
 

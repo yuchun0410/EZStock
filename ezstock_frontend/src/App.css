@@ -1,0 +1,89 @@
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+/* ---------- 頁首 ---------- */
+.header {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.header-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-decoration: none;
+  letter-spacing: 0.02em;
+}
+
+.logo span {
+  color: var(--color-accent);
+}
+
+.tagline {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.875rem;
+}
+
+/* ---------- 共用 ---------- */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.muted {
+  color: var(--color-muted);
+}
+
+.error {
+  color: var(--color-up);
+}
+
+.up {
+  color: var(--color-up);
+}
+
+.down {
+  color: var(--color-down);
+}
+
+/* ---------- 個股頁 ---------- */
+.stock-title {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.stock-meta {
+  margin: 4px 0 16px;
+}
+
+.stock-price {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.stock-close {
+  font-size: 2.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-change {
+  font-size: 1.125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
