@@ -3,6 +3,8 @@ package com.ezstock.dao;
 import com.ezstock.model.DailyPrice;
 import com.ezstock.model.Dividend;
 import com.ezstock.model.Stock;
+import com.ezstock.model.SplitType;
+import com.ezstock.model.StockSplit;
 import com.ezstock.model.StockType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -38,6 +40,9 @@ abstract class AbstractDaoTest {
 
     @Autowired
     protected DividendDao dividendDao;
+
+    @Autowired
+    protected StockSplitDao stockSplitDao;
 
     private Stock stock;
 
@@ -112,6 +117,25 @@ abstract class AbstractDaoTest {
                 .satisfies(d -> {
                     assertThat(d.getExDate()).isEqualTo(exDate);
                     assertThat(d.getCashDividend()).isEqualByComparingTo("4.5");
+                });
+    }
+
+    @Test
+    @DisplayName("股票分割：批次新增後可以依期間查詢，股數比例修正成整數")
+    void stockSplit() {
+        LocalDate splitDate = LocalDate.of(2025, 6, 18);
+        int inserted = stockSplitDao.insertAll(List.of(new StockSplit(
+                stock, splitDate, SplitType.SPLIT, new BigDecimal("188.65"), new BigDecimal("47.16"))));
+
+        assertThat(inserted).isEqualTo(1);
+        assertThat(stockSplitDao.findByStockAndDateRange(TEST_STOCK_ID,
+                LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31)))
+                .singleElement()
+                .satisfies(s -> {
+                    assertThat(s.getSplitDate()).isEqualTo(splitDate);
+                    assertThat(s.getSplitType()).isEqualTo(SplitType.SPLIT);
+                    assertThat(s.getBeforePrice()).isEqualByComparingTo("188.65");
+                    assertThat(s.shareRatio()).isEqualByComparingTo("4");
                 });
     }
 
