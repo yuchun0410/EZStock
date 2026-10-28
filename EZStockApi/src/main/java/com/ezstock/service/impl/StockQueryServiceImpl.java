@@ -9,11 +9,11 @@ import com.ezstock.exception.BadRequestException;
 import com.ezstock.exception.ResourceNotFoundException;
 import com.ezstock.model.DailyPrice;
 import com.ezstock.model.Stock;
+import com.ezstock.service.PriceLoader;
 import com.ezstock.service.StockQueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -22,8 +22,12 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * 注意：這個類別刻意不加 @Transactional(readOnly = true)。
+ * 查詢途中可能觸發按需載入（呼叫外部 API 並寫入資料庫），
+ * 不能包在唯讀交易裡，也不該讓交易在等待外部 API 時一直占住資料庫連線。
+ */
 @Service
-@Transactional(readOnly = true)
 public class StockQueryServiceImpl implements StockQueryService {
 
     private static final Logger log = LoggerFactory.getLogger(StockQueryServiceImpl.class);
@@ -36,11 +40,14 @@ public class StockQueryServiceImpl implements StockQueryService {
 
     private final StockDao stockDao;
     private final DailyPriceDao dailyPriceDao;
+    private final PriceLoader priceLoader;
     private final Clock clock;
 
-    public StockQueryServiceImpl(StockDao stockDao, DailyPriceDao dailyPriceDao, Clock clock) {
+    public StockQueryServiceImpl(StockDao stockDao, DailyPriceDao dailyPriceDao,
+                                 PriceLoader priceLoader, Clock clock) {
         this.stockDao = stockDao;
         this.dailyPriceDao = dailyPriceDao;
+        this.priceLoader = priceLoader;
         this.clock = clock;
     }
 
@@ -61,6 +68,7 @@ public class StockQueryServiceImpl implements StockQueryService {
     @Override
     public StockDetail getDetail(String stockId) {
         Stock stock = findStock(stockId);
+        priceLoader.ensureLoaded(stockId);
 
         Optional<DailyPrice> latest = dailyPriceDao.findLatest(stockId);
         if (latest.isEmpty()) {
@@ -101,6 +109,7 @@ public class StockQueryServiceImpl implements StockQueryService {
         }
 
         findStock(stockId);
+        priceLoader.ensureLoaded(stockId);
         List<PricePoint> result = dailyPriceDao.findByStockAndDateRange(stockId, start, end).stream()
                 .map(PricePoint::from)
                 .toList();
