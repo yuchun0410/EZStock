@@ -2,7 +2,9 @@ package com.ezstock.datasource.finmind;
 
 import com.ezstock.datasource.CashDividend;
 import com.ezstock.datasource.PriceBar;
+import com.ezstock.datasource.ShareSplit;
 import com.ezstock.datasource.StockInfo;
+import com.ezstock.model.SplitType;
 import com.ezstock.model.StockType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -90,6 +92,61 @@ class FinMindDataSourceTest {
             assertThat(d.exDate()).isEqualTo(LocalDate.of(2025, 3, 18));
             assertThat(d.cashDividend()).isEqualByComparingTo("4.5");
         });
+    }
+
+    @Test
+    @DisplayName("股票分割與面額變更：兩個 dataset 合併、依日期排序，略過價格不完整的")
+    void fetchShareSplits() {
+        setUp("my-token");
+        server.expect(queryParam("dataset", "TaiwanStockSplitPrice"))
+                .andExpect(queryParam("data_id", "0050"))
+                .andRespond(withSuccess("""
+                        {"msg":"success","status":200,"data":[
+                          {"date":"2025-06-18","stock_id":"0050","type":"分割","before_price":188.65,"after_price":47.16,
+                           "max_price":51.85,"min_price":42.45,"open_price":47.16},
+                          {"date":"2025-07-01","stock_id":"0050","type":"分割","before_price":null,"after_price":10}
+                        ]}""", MediaType.APPLICATION_JSON));
+        // 面額變更不能帶 data_id，會回傳整個市場的資料，要自己挑出 0050
+        server.expect(queryParam("dataset", "TaiwanStockParValueChange"))
+                .andExpect(request -> assertThat(request.getURI().getQuery()).doesNotContain("data_id"))
+                .andRespond(withSuccess("""
+                        {"msg":"success","status":200,"data":[
+                          {"date":"2024-03-04","stock_id":"0050","stock_name":"元大台灣50","before_close":100.0,
+                           "after_ref_close":10.0,"after_ref_max":11.0,"after_ref_min":9.0,"after_ref_open":10.0},
+                          {"date":"2024-05-06","stock_id":"1234","stock_name":"別檔","before_close":50.0,
+                           "after_ref_close":5.0,"after_ref_max":5.5,"after_ref_min":4.5,"after_ref_open":5.0}
+                        ]}""", MediaType.APPLICATION_JSON));
+
+        List<ShareSplit> splits = dataSource.fetchShareSplits("0050",
+                LocalDate.of(2024, 1, 1), LocalDate.of(2025, 12, 31));
+
+        server.verify();
+        assertThat(splits).extracting(ShareSplit::date)
+                .containsExactly(LocalDate.of(2024, 3, 4), LocalDate.of(2025, 6, 18));
+        assertThat(splits.get(0).type()).isEqualTo(SplitType.PAR_VALUE_CHANGE);
+        assertThat(splits.get(1).type()).isEqualTo(SplitType.SPLIT);
+        assertThat(splits.get(1).beforePrice()).isEqualByComparingTo("188.65");
+    }
+
+    @Test
+    @DisplayName("面額變更抓取失敗時，股票分割的結果照樣回傳")
+    void shareSplitsWhenParValueFails() {
+        setUp("my-token");
+        server.expect(queryParam("dataset", "TaiwanStockSplitPrice"))
+                .andRespond(withSuccess("""
+                        {"msg":"success","status":200,"data":[
+                          {"date":"2025-06-18","stock_id":"0050","type":"分割","before_price":188.65,"after_price":47.16}
+                        ]}""", MediaType.APPLICATION_JSON));
+        server.expect(queryParam("dataset", "TaiwanStockParValueChange"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"msg\":\"parameter data_id don't provide\",\"status\":400}"));
+
+        List<ShareSplit> splits = dataSource.fetchShareSplits("0050",
+                LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31));
+
+        server.verify();
+        assertThat(splits).singleElement().extracting(ShareSplit::date).isEqualTo(LocalDate.of(2025, 6, 18));
     }
 
     @Test
