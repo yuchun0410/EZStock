@@ -1,0 +1,98 @@
+# CI：每次 push 到 main、或對 main 開 PR，自動跑後端測試與前端檢查。
+# 兩個 job 同時跑，任何一個失敗，PR 上就會顯示紅色 ✗。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 同一個分支連續 push 時，取消還在跑的舊檢查，只跑最新的
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: 後端測試（Spring Boot + MySQL）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: EZStockApi
+
+    # 測試會連真的 MySQL（DAO 測試、Flyway），所以在 CI 裡臨時開一個。
+    # 這個資料庫只在這次檢查中存在，跑完就消失，密碼也只是 CI 專用的假密碼。
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-password
+          MYSQL_DATABASE: ezstock
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    steps:
+      - name: 取得程式碼
+        uses: actions/checkout@v4
+
+      - name: 安裝 Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # application.properties 有真的密碼和 token，沒有放進 Git。
+      # CI 改用範本檔，再用環境變數蓋掉資料庫連線設定（Spring Boot 的環境變數優先於設定檔）。
+      # FinMind 的 token 不需要：測試裡的 FinMind 都是模擬的，不會真的呼叫。
+      - name: 準備設定檔
+        run: cp src/main/resources/application.properties.example src/main/resources/application.properties
+
+      - name: 執行測試
+        run: ./mvnw -B test
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/ezstock?serverTimezone=Asia/Taipei
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: ci-password
+
+      # 測試失敗時，把測試報告存起來，可以在 GitHub 上下載來看哪裡錯了
+      - name: 上傳測試報告
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: EZStockApi/target/surefire-reports/
+
+  frontend:
+    name: 前端檢查（lint + build）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ezstock_frontend
+
+    steps:
+      - name: 取得程式碼
+        uses: actions/checkout@v4
+
+      - name: 安裝 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ezstock_frontend/package-lock.json
+
+      # npm ci：完全照 package-lock.json 安裝，比 npm install 更適合 CI（版本不會飄）
+      - name: 安裝套件
+        run: npm ci
+
+      - name: 程式碼檢查
+        run: npm run lint
+
+      - name: 打包
+        run: npm run build
