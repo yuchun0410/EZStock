@@ -22,7 +22,7 @@ mybatis.type-aliases-package=com.ezstock.model
 logging.level.com.ezstock=DEBUG
 # JPA / Hibernate 執行的 SQL 與參數
 logging.level.org.hibernate.SQL=DEBUG
-logging.level.org.hibernate.orm.jdbc.bind=TRACE
+logging.level.org.hibernate.orm.jdbc.bind=INFO
 # 同時寫進檔案，位置在 EZStockApi/logs/ezstock.log
 logging.file.name=logs/ezstock.log
 
