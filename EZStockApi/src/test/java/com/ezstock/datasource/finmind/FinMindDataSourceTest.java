@@ -93,7 +93,7 @@ class FinMindDataSourceTest {
     }
 
     @Test
-    @DisplayName("股票清單：同一檔只留一筆，ETF 依產業別判斷")
+    @DisplayName("股票清單：只留上市股票與 ETF，同一檔只留一筆，ETF 依產業別判斷")
     void fetchStockInfos() {
         setUp("my-token");
         server.expect(queryParam("dataset", "TaiwanStockInfo"))
@@ -101,13 +101,16 @@ class FinMindDataSourceTest {
                         {"msg":"success","status":200,"data":[
                           {"industry_category":"ETF","stock_id":"0050","stock_name":"元大台灣50","type":"twse","date":"2026-10-27"},
                           {"industry_category":"半導體業","stock_id":"2330","stock_name":"台積電","type":"twse","date":"2026-10-27"},
-                          {"industry_category":"電子工業","stock_id":"2330","stock_name":"台積電","type":"twse","date":"2026-10-27"}
+                          {"industry_category":"電子工業","stock_id":"2330","stock_name":"台積電","type":"twse","date":"2026-10-27"},
+                          {"industry_category":"ETF","stock_id":"00679B","stock_name":"元大美債20年","type":"twse","date":"2026-10-27"},
+                          {"industry_category":"半導體業","stock_id":"5483","stock_name":"中美晶","type":"tpex","date":"2026-10-27"},
+                          {"industry_category":"Index","stock_id":"TAIEX","stock_name":"發行量加權股價指數","type":"twse","date":"2026-10-27"}
                         ]}""", MediaType.APPLICATION_JSON));
 
         List<StockInfo> infos = dataSource.fetchStockInfos();
 
         server.verify();
-        assertThat(infos).extracting(StockInfo::stockId).containsExactly("0050", "2330");
+        assertThat(infos).extracting(StockInfo::stockId).containsExactly("0050", "2330", "00679B");
         assertThat(infos.get(0).type()).isEqualTo(StockType.ETF);
         assertThat(infos.get(1).type()).isEqualTo(StockType.STOCK);
         assertThat(infos.get(1).industry()).isEqualTo("半導體業");

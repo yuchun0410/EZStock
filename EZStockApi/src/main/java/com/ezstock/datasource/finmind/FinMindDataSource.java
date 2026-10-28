@@ -28,6 +28,9 @@ public class FinMindDataSource implements MarketDataSource {
 
     private static final Logger log = LoggerFactory.getLogger(FinMindDataSource.class);
 
+    /** 上市股票與 ETF 的代號格式：4 碼數字開頭，後面最多 2 碼數字或英文 */
+    private static final String LISTED_STOCK_ID = "\\d{4}[0-9A-Z]{0,2}";
+
     private final RestClient restClient;
     private final FinMindProperties properties;
 
@@ -49,15 +52,22 @@ public class FinMindDataSource implements MarketDataSource {
 
         // 同一檔股票可能出現多筆（不同產業別），只保留第一筆
         Map<String, StockInfo> infos = new LinkedHashMap<>();
+        int skipped = 0;
         for (FinMindDto.StockInfoRow row : rows) {
             if (row.stockId() == null || row.stockName() == null) {
+                skipped++;
+                continue;
+            }
+            // 第一版只做上市（twse）的股票與 ETF；代號是 4 碼數字開頭，例如 2330、0050、00878
+            if (!"twse".equals(row.type()) || !row.stockId().matches(LISTED_STOCK_ID)) {
+                skipped++;
                 continue;
             }
             StockType type = "ETF".equals(row.industryCategory()) ? StockType.ETF : StockType.STOCK;
             infos.putIfAbsent(row.stockId(),
                     new StockInfo(row.stockId(), row.stockName(), type, row.industryCategory()));
         }
-        log.debug("[FinMind] 股票清單去除重複後共 {} 檔", infos.size());
+        log.info("[FinMind] 股票清單共 {} 檔上市股票與 ETF（略過上櫃、興櫃、指數等 {} 筆）", infos.size(), skipped);
         return List.copyOf(infos.values());
     }
 
