@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { getStock } from '../api/stockApi'
+import DividendSection from '../components/DividendSection'
 import PriceSection from '../components/PriceSection'
 import { formatPrice, formatSigned, trendClass } from '../utils/format'
 
@@ -68,6 +69,9 @@ function StockPage() {
         )}
       </section>
       {detail.latestDate && <PriceSection stockId={detail.stockId} latestDate={detail.latestDate} />}
+      {detail.latestDate && (
+        <DividendSection stockId={detail.stockId} latestDate={detail.latestDate} latestClose={detail.latestClose} />
+      )}
     </>
   )
 }

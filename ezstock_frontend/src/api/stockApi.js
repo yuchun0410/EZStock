@@ -14,3 +14,8 @@ export function getStock(stockId) {
 export function getPrices(stockId, from, to) {
   return apiGet(`/api/stocks/${encodeURIComponent(stockId)}/prices`, { from, to })
 }
+
+/** 最近 10 年的除息紀錄，由新到舊 */
+export function getDividends(stockId) {
+  return apiGet(`/api/stocks/${encodeURIComponent(stockId)}/dividends`)
+}
