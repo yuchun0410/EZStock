@@ -5,8 +5,23 @@ spring.datasource.username=root
 spring.datasource.password=YOUR_DB_PASSWORD
 
 spring.jpa.hibernate.ddl-auto=validate
-spring.jpa.show-sql=true
 spring.jpa.open-in-view=false
 
 finmind.api.url=https://api.finmindtrade.com/api/v4/data
 finmind.api.token=YOUR_FINMIND_TOKEN
+
+# ---------- DAO 實作切換：jpa 或 mybatis ----------
+ezstock.dao.type=jpa
+
+# ---------- MyBatis ----------
+mybatis.mapper-locations=classpath:mapper/*.xml
+mybatis.type-aliases-package=com.ezstock.model
+
+# ---------- Log ----------
+# 自己的程式：DEBUG 以上都印（含 MyBatis 執行的 SQL 與參數）
+logging.level.com.ezstock=DEBUG
+# JPA / Hibernate 執行的 SQL 與參數
+logging.level.org.hibernate.SQL=DEBUG
+logging.level.org.hibernate.orm.jdbc.bind=TRACE
+# 同時寫進檔案，位置在 EZStockApi/logs/ezstock.log
+logging.file.name=logs/ezstock.log
