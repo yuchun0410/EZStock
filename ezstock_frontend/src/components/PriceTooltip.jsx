@@ -12,7 +12,8 @@ function PriceTooltip({ active, payload, weekly, maPeriods = [] }) {
         收盤 <strong>{formatPrice(p.close)}</strong>
       </div>
       <div className="muted">
-        開 {formatPrice(p.open)}　高 {formatPrice(p.high)}　低 {formatPrice(p.low)}
+        {/* 用全形空白（\u3000）分隔比較好讀。直接打全形空白，ESLint 會當成不正常的空白字元 */}
+        {`開 ${formatPrice(p.open)}\u3000高 ${formatPrice(p.high)}\u3000低 ${formatPrice(p.low)}`}
       </div>
       <div className="muted">成交量 {formatLots(p.volume)} 張</div>
       {MOVING_AVERAGES.filter((ma) => maPeriods.includes(ma.period) && p[`ma${ma.period}`] != null).map((ma) => (
