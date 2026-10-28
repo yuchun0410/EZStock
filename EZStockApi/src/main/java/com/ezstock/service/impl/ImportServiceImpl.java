@@ -4,13 +4,17 @@ import com.ezstock.config.ImportProperties;
 import com.ezstock.dao.DailyPriceDao;
 import com.ezstock.dao.DividendDao;
 import com.ezstock.dao.StockDao;
+import com.ezstock.dao.StockSplitDao;
 import com.ezstock.datasource.CashDividend;
 import com.ezstock.datasource.MarketDataSource;
 import com.ezstock.datasource.PriceBar;
+import com.ezstock.datasource.ShareSplit;
 import com.ezstock.datasource.StockInfo;
+import com.ezstock.datasource.finmind.FinMindApiException;
 import com.ezstock.model.DailyPrice;
 import com.ezstock.model.Dividend;
 import com.ezstock.model.Stock;
+import com.ezstock.model.StockSplit;
 import com.ezstock.service.ImportResult;
 import com.ezstock.service.ImportService;
 import com.ezstock.service.StockImportResult;
@@ -37,6 +41,7 @@ public class ImportServiceImpl implements ImportService {
     private final StockDao stockDao;
     private final DailyPriceDao dailyPriceDao;
     private final DividendDao dividendDao;
+    private final StockSplitDao stockSplitDao;
     private final ImportProperties properties;
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
@@ -47,9 +52,10 @@ public class ImportServiceImpl implements ImportService {
                              StockDao stockDao,
                              DailyPriceDao dailyPriceDao,
                              DividendDao dividendDao,
+                             StockSplitDao stockSplitDao,
                              ImportProperties properties,
                              PlatformTransactionManager transactionManager) {
-        this(marketDataSource, stockDao, dailyPriceDao, dividendDao, properties,
+        this(marketDataSource, stockDao, dailyPriceDao, dividendDao, stockSplitDao, properties,
                 transactionManager, Clock.systemDefaultZone());
     }
 
@@ -58,6 +64,7 @@ public class ImportServiceImpl implements ImportService {
                       StockDao stockDao,
                       DailyPriceDao dailyPriceDao,
                       DividendDao dividendDao,
+                      StockSplitDao stockSplitDao,
                       ImportProperties properties,
                       PlatformTransactionManager transactionManager,
                       Clock clock) {
@@ -65,6 +72,7 @@ public class ImportServiceImpl implements ImportService {
         this.stockDao = stockDao;
         this.dailyPriceDao = dailyPriceDao;
         this.dividendDao = dividendDao;
+        this.stockSplitDao = stockSplitDao;
         this.properties = properties;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.clock = clock;
@@ -96,9 +104,9 @@ public class ImportServiceImpl implements ImportService {
 
         ImportResult result = new ImportResult(stockListCount, succeeded, failed,
                 System.currentTimeMillis() - start);
-        log.info("匯入完成：股票清單 {} 檔；價格成功 {} 檔、失敗 {} 檔 {}；新增日線 {} 筆、股利 {} 筆；耗時 {} 秒",
+        log.info("匯入完成：股票清單 {} 檔；價格成功 {} 檔、失敗 {} 檔 {}；新增日線 {} 筆、股利 {} 筆、股票分割 {} 筆；耗時 {} 秒",
                 result.stockListCount(), succeeded.size(), failed.size(), failed,
-                result.totalPricesInserted(), result.totalDividendsInserted(),
+                result.totalPricesInserted(), result.totalDividendsInserted(), result.totalSplitsInserted(),
                 result.elapsedMillis() / 1000);
         return result;
     }
@@ -112,18 +120,33 @@ public class ImportServiceImpl implements ImportService {
         // 先在交易外呼叫外部 API：網路可能很慢，不要讓資料庫交易一直開著等
         List<PriceBar> bars = marketDataSource.fetchPrices(stockId, from, to);
         List<CashDividend> cashDividends = marketDataSource.fetchCashDividends(stockId, from, to);
+        List<ShareSplit> shareSplits = fetchShareSplitsSafely(stockId, from, to);
 
-        // 再用一個交易寫入：日線和股利要嘛都成功，要嘛都不寫
+        // 再用一個交易寫入：日線、股利、股票分割要嘛都成功，要嘛都不寫
         StockImportResult result = transactionTemplate.execute(status -> {
             Stock stock = stockDao.findById(stockId)
                     .orElseThrow(() -> new IllegalStateException("股票清單中找不到 " + stockId + "，請先匯入股票清單"));
-            return saveNewData(stock, bars, cashDividends, from, to);
+            return saveNewData(stock, bars, cashDividends, shareSplits, from, to);
         });
 
-        log.info("匯入 {} 完成：日線新增 {} 筆、略過 {} 筆（已存在）；股利新增 {} 筆、略過 {} 筆（已存在）",
+        log.info("匯入 {} 完成：日線新增 {} 筆、略過 {} 筆（已存在）；股利新增 {} 筆、略過 {} 筆（已存在）；股票分割新增 {} 筆",
                 stockId, result.pricesInserted(), result.pricesSkipped(),
-                result.dividendsInserted(), result.dividendsSkipped());
+                result.dividendsInserted(), result.dividendsSkipped(), result.splitsInserted());
         return result;
+    }
+
+    /**
+     * 股票分割抓不到時不讓整檔匯入失敗：價格和股利才是主要資料，
+     * 沒有分割資料只會影響少數有分割的股票，回測那邊也有異常跳動的警告可以補救。
+     * 不重試，避免一直打 FinMind 被封鎖。
+     */
+    private List<ShareSplit> fetchShareSplitsSafely(String stockId, LocalDate from, LocalDate to) {
+        try {
+            return marketDataSource.fetchShareSplits(stockId, from, to);
+        } catch (FinMindApiException e) {
+            log.warn("匯入 {}：股票分割資料抓取失敗，這次先略過：{}", stockId, e.getMessage());
+            return List.of();
+        }
     }
 
     private int importStockList() {
@@ -140,7 +163,7 @@ public class ImportServiceImpl implements ImportService {
 
     /** 只新增資料庫裡還沒有的日期，重複執行匯入也不會重複寫入 */
     private StockImportResult saveNewData(Stock stock, List<PriceBar> bars, List<CashDividend> cashDividends,
-                                          LocalDate from, LocalDate to) {
+                                          List<ShareSplit> shareSplits, LocalDate from, LocalDate to) {
         String stockId = stock.getStockId();
 
         Set<LocalDate> existingDates = new HashSet<>(dailyPriceDao.findTradeDates(stockId, from, to));
@@ -165,8 +188,21 @@ public class ImportServiceImpl implements ImportService {
         }
         int dividendsInserted = dividendDao.insertAll(newDividends);
 
+        Set<LocalDate> existingSplitDates = new HashSet<>();
+        for (StockSplit s : stockSplitDao.findByStockAndDateRange(stockId, from, to)) {
+            existingSplitDates.add(s.getSplitDate());
+        }
+        List<StockSplit> newSplits = new ArrayList<>();
+        for (ShareSplit split : shareSplits) {
+            if (existingSplitDates.add(split.date())) {
+                newSplits.add(new StockSplit(stock, split.date(), split.type(), split.beforePrice(), split.afterPrice()));
+            }
+        }
+        int splitsInserted = stockSplitDao.insertAll(newSplits);
+
         return new StockImportResult(stockId,
                 pricesInserted, bars.size() - newPrices.size(),
-                dividendsInserted, cashDividends.size() - newDividends.size());
+                dividendsInserted, cashDividends.size() - newDividends.size(),
+                splitsInserted);
     }
 }

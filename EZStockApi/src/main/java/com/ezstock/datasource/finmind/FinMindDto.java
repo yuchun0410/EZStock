@@ -8,7 +8,7 @@ import java.util.List;
 
 /**
  * FinMind API 回傳的 JSON 格式。
- * 只在 finmind 套件內使用，其他地方一律轉成 StockInfo、PriceBar、CashDividend。
+ * 只在 finmind 套件內使用，其他地方一律轉成 StockInfo、PriceBar、CashDividend、ShareSplit。
  */
 final class FinMindDto {
 
@@ -47,5 +47,24 @@ final class FinMindDto {
             @JsonProperty("stock_id") String stockId,
             @JsonProperty("stock_and_cache_dividend") BigDecimal value,
             @JsonProperty("stock_or_cache_dividend") String kind) {
+    }
+
+    /** TaiwanStockSplitPrice（台股分割後參考價） */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record SplitPriceRow(
+            @JsonProperty("date") String date,
+            @JsonProperty("stock_id") String stockId,
+            @JsonProperty("type") String type,
+            @JsonProperty("before_price") BigDecimal beforePrice,
+            @JsonProperty("after_price") BigDecimal afterPrice) {
+    }
+
+    /** TaiwanStockParValueChange（變更面額恢復買賣參考價格） */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record ParValueChangeRow(
+            @JsonProperty("date") String date,
+            @JsonProperty("stock_id") String stockId,
+            @JsonProperty("before_close") BigDecimal beforeClose,
+            @JsonProperty("after_ref_close") BigDecimal afterRefClose) {
     }
 }

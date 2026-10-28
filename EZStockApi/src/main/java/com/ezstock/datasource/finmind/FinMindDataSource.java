@@ -3,7 +3,9 @@ package com.ezstock.datasource.finmind;
 import com.ezstock.datasource.CashDividend;
 import com.ezstock.datasource.MarketDataSource;
 import com.ezstock.datasource.PriceBar;
+import com.ezstock.datasource.ShareSplit;
 import com.ezstock.datasource.StockInfo;
+import com.ezstock.model.SplitType;
 import com.ezstock.model.StockType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,8 +15,10 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -115,6 +119,61 @@ public class FinMindDataSource implements MarketDataSource {
             }
         }
         return dividends;
+    }
+
+    /**
+     * 股票分割和面額變更是兩個不同的 dataset，各呼叫一次再合併、依日期排序。
+     * 兩者對回測的影響一樣：股數乘上「事件前價格 / 事件後價格」。
+     *
+     * 兩個 dataset 各自容錯：其中一個失敗只記 WARN，另一個的結果照樣回傳，
+     * 不會因為面額變更抓不到，就連股票分割也一起丟掉。
+     */
+    @Override
+    public List<ShareSplit> fetchShareSplits(String stockId, LocalDate from, LocalDate to) {
+        List<ShareSplit> splits = new ArrayList<>();
+
+        try {
+            List<FinMindDto.SplitPriceRow> splitRows = call("TaiwanStockSplitPrice", stockId, from, to,
+                    new ParameterizedTypeReference<FinMindDto.Response<FinMindDto.SplitPriceRow>>() {
+                    });
+            for (FinMindDto.SplitPriceRow row : splitRows) {
+                addIfValid(splits, stockId, row.date(), SplitType.SPLIT, row.beforePrice(), row.afterPrice());
+            }
+        } catch (FinMindApiException e) {
+            log.warn("[FinMind] {} 股票分割資料抓取失敗，略過：{}", stockId, e.getMessage());
+        }
+
+        try {
+            // 這個 dataset 不接受 data_id（帶了會回 400），只能抓整個市場這段期間的資料，再自己挑出這一檔。
+            // 面額變更很少見，整個市場 5 年也只有幾十筆，資料量不大。
+            List<FinMindDto.ParValueChangeRow> parRows = call("TaiwanStockParValueChange", null, from, to,
+                    new ParameterizedTypeReference<FinMindDto.Response<FinMindDto.ParValueChangeRow>>() {
+                    });
+            for (FinMindDto.ParValueChangeRow row : parRows) {
+                if (stockId.equals(row.stockId())) {
+                    addIfValid(splits, stockId, row.date(), SplitType.PAR_VALUE_CHANGE, row.beforeClose(), row.afterRefClose());
+                }
+            }
+        } catch (FinMindApiException e) {
+            log.warn("[FinMind] {} 面額變更資料抓取失敗，略過：{}", stockId, e.getMessage());
+        }
+
+        splits.sort(Comparator.comparing(ShareSplit::date));
+        if (!splits.isEmpty()) {
+            log.info("[FinMind] {} 共有 {} 筆股票分割或面額變更：{}", stockId, splits.size(),
+                    splits.stream().map(s -> s.date() + " " + s.type()).toList());
+        }
+        return splits;
+    }
+
+    private void addIfValid(List<ShareSplit> splits, String stockId, String date, SplitType type,
+                            BigDecimal before, BigDecimal after) {
+        if (date == null || before == null || after == null || before.signum() <= 0 || after.signum() <= 0) {
+            log.warn("[FinMind] 略過資料不完整的{} stockId={} date={} before={} after={}",
+                    type == SplitType.SPLIT ? "股票分割" : "面額變更", stockId, date, before, after);
+            return;
+        }
+        splits.add(new ShareSplit(stockId, LocalDate.parse(date), type, before, after));
     }
 
     /** FinMind 的錯誤回應會帶 token 尾碼（token_tail），寫進 log 前先遮掉 */
