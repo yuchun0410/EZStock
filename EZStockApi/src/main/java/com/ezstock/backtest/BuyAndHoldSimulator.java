@@ -3,7 +3,9 @@ package com.ezstock.backtest;
 import com.ezstock.backtest.cost.CostModel;
 import com.ezstock.model.DailyPrice;
 import com.ezstock.model.Dividend;
+import com.ezstock.model.SplitType;
 import com.ezstock.model.Stock;
+import com.ezstock.model.StockSplit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,6 +13,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -23,6 +27,7 @@ import java.util.stream.Collectors;
  * <ol>
  *   <li>起始日之後的第一個交易日，用<b>開盤價</b>買進，能買幾股就買幾股（含手續費不超過本金），可以買零股</li>
  *   <li>除息日當天把現金股利加進現金；選擇再投入時，當天用<b>收盤價</b>買進</li>
+ *   <li>股票分割、面額變更的那天，股數乘上分割比例（例如 1 拆 4 就變 4 倍），價值不變</li>
  *   <li>每天收盤後記錄一次資產 = 股數 × 收盤價 + 現金</li>
  * </ol>
  * 簡化：股利當天入帳（實際約一個月後發放）、不計股利所得稅與二代健保、期末不賣出。
@@ -33,6 +38,15 @@ public class BuyAndHoldSimulator {
 
     private static final Logger log = LoggerFactory.getLogger(BuyAndHoldSimulator.class);
 
+    /**
+     * 台股每天漲跌幅限制 10%。前後兩天的收盤價差超過 11%（多留一點緩衝），
+     * 又不是分割日，通常是減資、合併之類還沒處理的公司行為，回測結果可能失真，要提醒使用者。
+     */
+    static final BigDecimal ABNORMAL_MOVE_PERCENT = new BigDecimal("11");
+
+    /** 同一檔最多列出幾筆異常，避免警告洗版 */
+    static final int MAX_WARNINGS = 3;
+
     private final CostModel costModel;
 
     public BuyAndHoldSimulator(CostModel costModel) {
@@ -42,9 +56,10 @@ public class BuyAndHoldSimulator {
     /**
      * @param prices    起始日之後的日線，依日期由舊到新；第一筆就是買進日
      * @param dividends 同一段期間的除息紀錄
+     * @param splits    同一段期間的股票分割與面額變更
      */
     public HoldingResult simulate(Stock stock, List<DailyPrice> prices, List<Dividend> dividends,
-                                  BigDecimal initialCapital, boolean reinvestDividends) {
+                                  List<StockSplit> splits, BigDecimal initialCapital, boolean reinvestDividends) {
         if (prices.isEmpty()) {
             throw new IllegalArgumentException(stock.getStockId() + " 在這段期間沒有價格資料");
         }
@@ -67,10 +82,61 @@ public class BuyAndHoldSimulator {
 
         Map<LocalDate, Dividend> dividendByDate = dividends.stream()
                 .collect(Collectors.toMap(Dividend::getExDate, Function.identity(), (a, b) -> a));
+        // 買進日當天或之前的分割，價格已經是分割後的，不用再調整
+        Iterator<StockSplit> pendingSplits = splits.stream()
+                .filter(s -> s.getSplitDate().isAfter(first.getTradeDate()))
+                .sorted(Comparator.comparing(StockSplit::getSplitDate))
+                .iterator();
+        StockSplit nextSplit = pendingSplits.hasNext() ? pendingSplits.next() : null;
+
         List<EquityPoint> curve = new ArrayList<>(prices.size());
+        List<String> warnings = new ArrayList<>();
+        int abnormalMoves = 0;
+        BigDecimal previousClose = null;
 
         for (DailyPrice price : prices) {
+            // 1. 分割：分割日可能剛好停止交易，所以只要「已經到了或過了分割日」就套用
+            boolean splitToday = false;
+            while (nextSplit != null && !nextSplit.getSplitDate().isAfter(price.getTradeDate())) {
+                long before = shares;
+                shares = BigDecimal.valueOf(shares).multiply(nextSplit.shareRatio())
+                        .setScale(0, RoundingMode.DOWN).longValue();
+                splitToday = true;
+                log.info("[回測] {} 於 {} {}，比例 {}：股數 {} → {}",
+                        stock.getStockId(), price.getTradeDate(),
+                        nextSplit.getSplitType() == SplitType.SPLIT ? "股票分割" : "面額變更",
+                        nextSplit.shareRatio().stripTrailingZeros().toPlainString(), before, shares);
+                nextSplit = pendingSplits.hasNext() ? pendingSplits.next() : null;
+            }
+
             Dividend dividend = dividendByDate.get(price.getTradeDate());
+
+            // 2. 檢查價格異常跳動（除息會讓參考價下降，要先扣掉股利再比較）
+            if (previousClose != null && !splitToday) {
+                BigDecimal reference = dividend == null
+                        ? previousClose : previousClose.subtract(dividend.getCashDividend());
+                if (reference.signum() > 0) {
+                    BigDecimal movePercent = price.getClosePrice().subtract(reference)
+                            .multiply(BigDecimal.valueOf(100))
+                            .divide(reference, 2, RoundingMode.HALF_UP);
+                    if (movePercent.abs().compareTo(ABNORMAL_MOVE_PERCENT) > 0) {
+                        abnormalMoves++;
+                        String warning = String.format(
+                                "%s %s 在 %s 收盤 %s，比前一個交易日 %s 變動 %s%%，超過台股 10%% 漲跌幅限制，"
+                                        + "可能有減資等尚未處理的事件，回測結果可能不準確",
+                                stock.getStockId(), stock.getName(), price.getTradeDate(),
+                                price.getClosePrice().toPlainString(), previousClose.toPlainString(),
+                                movePercent.toPlainString());
+                        log.warn("[回測] {}", warning);
+                        if (abnormalMoves <= MAX_WARNINGS) {
+                            warnings.add(warning);
+                        }
+                    }
+                }
+            }
+            previousClose = price.getClosePrice();
+
+            // 3. 股利
             if (dividend != null) {
                 BigDecimal received = dividend.getCashDividend().multiply(BigDecimal.valueOf(shares))
                         .setScale(0, RoundingMode.DOWN);
@@ -90,9 +156,15 @@ public class BuyAndHoldSimulator {
                     }
                 }
             }
+            // 4. 收盤後記錄資產
             BigDecimal value = price.getClosePrice().multiply(BigDecimal.valueOf(shares)).add(cash)
                     .setScale(0, RoundingMode.HALF_UP);
             curve.add(new EquityPoint(price.getTradeDate(), value));
+        }
+
+        if (abnormalMoves > MAX_WARNINGS) {
+            warnings.add(String.format("%s 另外還有 %d 筆價格異常跳動，詳見系統紀錄",
+                    stock.getStockId(), abnormalMoves - MAX_WARNINGS));
         }
 
         PerformanceMetrics metrics = PerformanceMetrics.of(initialCapital, curve);
@@ -104,7 +176,8 @@ public class BuyAndHoldSimulator {
                 metrics.maxDrawdownPercent(), totalDividends, totalCosts);
 
         return new HoldingResult(stock.getStockId(), stock.getName(), first.getTradeDate(), buyPrice,
-                initial.shares(), shares, cash, finalValue, totalDividends, totalCosts, metrics, curve);
+                initial.shares(), shares, cash, finalValue, totalDividends, totalCosts, metrics, curve,
+                List.copyOf(warnings));
     }
 
     /**
