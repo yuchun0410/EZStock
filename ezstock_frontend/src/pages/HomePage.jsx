@@ -21,9 +21,13 @@ const TYPE_LABELS = { STOCK: '股票', ETF: 'ETF' }
 /** 首頁：輸入代號或名稱搜尋股票 */
 function HomePage() {
   const navigate = useNavigate()
+  // input：輸入框上看到的字；query：真正拿去搜尋的字。
+  // 用注音、倉頡打字時，選字前輸入框會先出現「ㄊㄞ」這種組字中的符號，
+  // 這時只更新 input，等選完字（compositionend）才更新 query，避免拿注音去搜尋。
   const [input, setInput] = useState('')
+  const [query, setQuery] = useState('')
   const [result, setResult] = useState({ keyword: '', stocks: [], error: null })
-  const keyword = input.trim()
+  const keyword = query.trim()
 
   useEffect(() => {
     if (!keyword) return
@@ -71,7 +75,11 @@ function HomePage() {
             type="search"
             placeholder="輸入代號或名稱，例如 2330、台積"
             value={input}
-            onChange={(event) => setInput(event.target.value)}
+            onChange={(event) => {
+              setInput(event.target.value)
+              if (!event.nativeEvent.isComposing) setQuery(event.target.value)
+            }}
+            onCompositionEnd={(event) => setQuery(event.currentTarget.value)}
             autoComplete="off"
             autoFocus
           />
