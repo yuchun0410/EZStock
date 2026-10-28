@@ -1,88 +1,92 @@
 import {
+  Bar,
   CartesianGrid,
+  ComposedChart,
   Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
-import { formatLots, formatPrice } from '../utils/format'
-
-// SVG 的屬性不一定吃 CSS 變數，這裡直接寫色碼（跟 index.css 的變數同色）
-const COLORS = {
-  up: '#d63a3a',
-  down: '#1f9d55',
-  neutral: '#1f3a5f',
-  grid: '#e1e4ea',
-  axis: '#6b7385',
-  surface: '#ffffff',
-}
+import { formatPrice } from '../utils/format'
+import { CHART_COLORS, CHART_SYNC_ID, Y_AXIS_WIDTH, candleColor } from './chartConfig'
+import PriceTooltip from './PriceTooltip'
 
 /**
- * 收盤價走勢圖（單一折線）。
- * 線的顏色跟著「這段期間」的漲跌：期間上漲紅色、下跌綠色。
+ * 價格走勢圖：mode = 'line' 畫收盤價折線，mode = 'candle' 畫 K 線。
+ * 折線的顏色跟著「這段期間」的漲跌：期間上漲紅色、下跌綠色。
  */
-function PriceChart({ prices, trend, longRange }) {
-  const data = prices.map((p) => ({ ...p, close: Number(p.close) }))
-  const lineColor = COLORS[trend] ?? COLORS.neutral
+function PriceChart({ points, mode, trend, longRange, weekly }) {
+  const lineColor = CHART_COLORS[trend] ?? CHART_COLORS.neutral
 
   return (
-    <div className="chart" role="img" aria-label="收盤價走勢圖">
+    <div className="chart" role="img" aria-label={mode === 'candle' ? 'K 線圖' : '收盤價走勢圖'}>
       <ResponsiveContainer width="100%" height={320}>
-        <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-          <CartesianGrid vertical={false} stroke={COLORS.grid} />
+        <ComposedChart
+          data={points}
+          syncId={CHART_SYNC_ID}
+          barCategoryGap="20%"
+          margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+        >
+          <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
           <XAxis
             dataKey="date"
             tickFormatter={(date) => (longRange ? date.slice(0, 7).replace('-', '/') : date.slice(5).replace('-', '/'))}
             minTickGap={40}
-            tick={{ fill: COLORS.axis, fontSize: 12 }}
+            tick={{ fill: CHART_COLORS.axis, fontSize: 12 }}
             tickLine={false}
-            axisLine={{ stroke: COLORS.grid }}
+            axisLine={{ stroke: CHART_COLORS.grid }}
           />
           <YAxis
             domain={['auto', 'auto']}
             tickFormatter={(value) => formatPrice(value).replace(/\.00$/, '')}
-            width={64}
-            tick={{ fill: COLORS.axis, fontSize: 12 }}
+            width={Y_AXIS_WIDTH}
+            tick={{ fill: CHART_COLORS.axis, fontSize: 12 }}
             tickLine={false}
             axisLine={false}
           />
           <Tooltip
-            content={<PriceTooltip />}
-            cursor={{ stroke: COLORS.axis, strokeDasharray: '4 4' }}
+            content={<PriceTooltip weekly={weekly} />}
+            cursor={{ stroke: CHART_COLORS.axis, strokeDasharray: '4 4' }}
             isAnimationActive={false}
           />
-          <Line
-            type="monotone"
-            dataKey="close"
-            stroke={lineColor}
-            strokeWidth={2}
-            dot={false}
-            activeDot={{ r: 5, stroke: COLORS.surface, strokeWidth: 2 }}
-            isAnimationActive={false}
-          />
-        </LineChart>
+          {mode === 'candle' ? (
+            <Bar dataKey="range" shape={<Candle />} isAnimationActive={false} />
+          ) : (
+            <Line
+              type="monotone"
+              dataKey="close"
+              stroke={lineColor}
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 5, stroke: CHART_COLORS.surface, strokeWidth: 2 }}
+              isAnimationActive={false}
+            />
+          )}
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   )
 }
 
-/** 滑鼠移到某一天時顯示的資訊框 */
-function PriceTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null
-  const p = payload[0].payload
+/**
+ * 一根 K 棒。Recharts 把 [最低, 最高] 換算成畫面上的 y（最高點）和 height（最高到最低的高度），
+ * 我們用同樣的比例算出開盤、收盤的位置：細線是最高到最低（影線），粗的矩形是開盤到收盤（實體）。
+ */
+function Candle({ x, y, width, height, payload }) {
+  const { open, close, high, low } = payload
+  const color = candleColor(payload)
+  const pixelsPerPoint = high === low ? 0 : height / (high - low)
+  const bodyTop = y + (high - Math.max(open, close)) * pixelsPerPoint
+  const bodyHeight = Math.max(1, Math.abs(close - open) * pixelsPerPoint)
+  const centerX = x + width / 2
+  const bodyWidth = Math.max(1, width)
+
   return (
-    <div className="chart-tooltip">
-      <div className="chart-tooltip-date">{p.date}</div>
-      <div>
-        收盤 <strong>{formatPrice(p.close)}</strong>
-      </div>
-      <div className="muted">
-        開 {formatPrice(p.open)}　高 {formatPrice(p.high)}　低 {formatPrice(p.low)}
-      </div>
-      <div className="muted">成交量 {formatLots(p.volume)} 張</div>
-    </div>
+    <g>
+      <line x1={centerX} x2={centerX} y1={y} y2={y + height} stroke={color} strokeWidth={1} />
+      <rect x={centerX - bodyWidth / 2} y={bodyTop} width={bodyWidth} height={bodyHeight} fill={color} />
+    </g>
   )
 }
 
