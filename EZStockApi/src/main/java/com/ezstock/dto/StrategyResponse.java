@@ -16,6 +16,7 @@ import java.util.List;
  */
 public record StrategyResponse(String stockId, String name,
                                LocalDate startDate, LocalDate endDate, BigDecimal initialCapital,
+                               boolean reinvestDividends,
                                String entryDescription, String exitDescription, String costDescription,
                                StrategyResult strategy, HoldingResult benchmark,
                                List<String> assumptions) {

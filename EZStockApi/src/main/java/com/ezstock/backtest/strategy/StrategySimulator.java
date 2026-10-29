@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
  *   <li>條件成立的話，<b>隔天開盤價</b>買進或賣出（避免偷看未來的資料）</li>
  *   <li>空手時只看買進條件；持有時只看賣出條件</li>
  *   <li>每次買進都用手上全部的現金，能買幾股就買幾股（可以買零股）</li>
- *   <li>持有期間領到的股利存成現金，下次買進時一起用</li>
+ *   <li>持有期間領到的股利：選擇再投入的話，除息日用收盤價加碼買進；否則存成現金，下次買進時一起用</li>
  *   <li>持有期間遇到股票分割，股數和買進價都依比例調整</li>
  * </ol>
  *
@@ -47,21 +47,43 @@ public class StrategySimulator {
         this.costModel = costModel;
     }
 
+    /** 從第一根 K 棒就開始交易，股利存成現金 */
     public StrategyResult simulate(Stock stock, List<DailyPrice> prices, List<Dividend> dividends,
                                    List<StockSplit> splits, Condition entry, Condition exit,
                                    BigDecimal initialCapital) {
+        return simulate(stock, prices, dividends, splits, entry, exit, initialCapital, null, false);
+    }
+
+    /**
+     * @param tradeFrom 從哪一天開始交易。prices 可以包含更早的資料，那些只拿來算指標（暖機），
+     *                  例如年線要 240 天的資料，不往前多抓的話，回測的第一年都不會有訊號。
+     *                  null 代表從第一根 K 棒就開始
+     * @param reinvestDividends 持有中領到股利時，是否在除息日用收盤價加碼買進
+     */
+    public StrategyResult simulate(Stock stock, List<DailyPrice> prices, List<Dividend> dividends,
+                                   List<StockSplit> splits, Condition entry, Condition exit,
+                                   BigDecimal initialCapital, LocalDate tradeFrom, boolean reinvestDividends) {
         if (prices.isEmpty()) {
             throw new IllegalArgumentException(stock.getStockId() + " 在這段期間沒有價格資料");
         }
         String stockId = stock.getStockId();
         BarSeries series = new BarSeries(prices);
+        int startIndex = 0;
+        if (tradeFrom != null) {
+            while (startIndex < series.size() && series.date(startIndex).isBefore(tradeFrom)) {
+                startIndex++;
+            }
+            if (startIndex == series.size()) {
+                throw new IllegalArgumentException(stockId + " 在 " + tradeFrom + " 之後沒有價格資料");
+            }
+        }
         Map<LocalDate, Dividend> dividendByDate = dividends.stream()
                 .collect(Collectors.toMap(Dividend::getExDate, Function.identity(), (a, b) -> a));
         Map<LocalDate, StockSplit> splitByDate = splits.stream()
                 .collect(Collectors.toMap(StockSplit::getSplitDate, Function.identity(), (a, b) -> a));
 
-        log.info("[條件回測] {} {} 開始：{} ~ {}，本金 {} 元；買進：{}；賣出：{}",
-                stockId, stock.getName(), series.date(0), series.date(series.size() - 1),
+        log.info("[條件回測] {} {} 開始：{} ~ {}（前面 {} 根 K 棒只用來計算指標），本金 {} 元；買進：{}；賣出：{}",
+                stockId, stock.getName(), series.date(startIndex), series.date(series.size() - 1), startIndex,
                 initialCapital.toPlainString(), entry.describe(), exit.describe());
 
         BigDecimal cash = initialCapital;
@@ -75,9 +97,9 @@ public class StrategySimulator {
         int daysInMarket = 0;
 
         List<Trade> trades = new ArrayList<>();
-        List<EquityPoint> curve = new ArrayList<>(series.size());
+        List<EquityPoint> curve = new ArrayList<>(series.size() - startIndex);
 
-        for (int i = 0; i < series.size(); i++) {
+        for (int i = startIndex; i < series.size(); i++) {
             LocalDate date = series.date(i);
 
             // 1. 股票分割：持有中的話，股數變多、買進價等比例變低，停利停損才不會誤判
@@ -138,6 +160,22 @@ public class StrategySimulator {
                 positionDividends = positionDividends.add(received);
                 totalDividends = totalDividends.add(received);
                 log.debug("[條件回測] {} {} 除息，領到 {} 元", stockId, date, received);
+
+                if (reinvestDividends) {
+                    BigDecimal close = series.close(i);
+                    long more = maxShares(stock, close, cash);
+                    if (more > 0) {
+                        BigDecimal amount = close.multiply(BigDecimal.valueOf(more));
+                        BigDecimal fee = costModel.buyCost(amount, stock.getType());
+                        cash = cash.subtract(amount).subtract(fee);
+                        shares += more;
+                        // 加碼的錢算進這筆部位的成本，賣出時損益才會正確
+                        positionCost = positionCost.add(amount).add(fee);
+                        totalCosts = totalCosts.add(fee);
+                        log.debug("[條件回測] {} {} 股利再投入：以收盤價 {} 加碼 {} 股，持股變成 {} 股",
+                                stockId, date, close, more, shares);
+                    }
+                }
             }
 
             // 4. 收盤後判斷條件，成立的話留到明天開盤執行

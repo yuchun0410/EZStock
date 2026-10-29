@@ -18,6 +18,7 @@ import java.util.List;
  *
  * @param entryConditions 買進條件，全部成立才買（1～3 個）
  * @param exitConditions  賣出條件，任一個成立就賣（1～3 個）
+ * @param reinvestDividends 股利是否再投入（條件策略和對照組一致），不給預設 true
  */
 public record StrategyRequest(
         @NotBlank(message = "請選擇股票")
@@ -41,6 +42,8 @@ public record StrategyRequest(
         @NotEmpty(message = "請至少設定 1 個賣出條件")
         @Size(max = 3, message = "賣出條件最多 3 個")
         List<@Valid ConditionSpec> exitConditions,
+
+        Boolean reinvestDividends,
 
         Boolean includeCosts,
 
