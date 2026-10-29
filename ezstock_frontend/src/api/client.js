@@ -61,6 +61,14 @@ export function refreshSession() {
   return refreshing
 }
 
+export function apiPut(path, payload) {
+  return request('PUT', path, payload)
+}
+
+export function apiDelete(path) {
+  return request('DELETE', path)
+}
+
 async function request(method, url, payload, { retry = true } = {}) {
   // 網址裡的中文會被編碼成 %E5%8F%B0...，log 顯示解碼後的版本比較好讀
   const label = `${method} ${decodeURIComponent(url)}`
