@@ -35,13 +35,13 @@ class ConditionFactoryTest {
     void entry() {
         Condition single = ConditionFactory.entry(List.of(rule(ConditionType.CLOSE_BELOW_LOWEST_LOW, "5")));
         assertThat(single).isInstanceOf(CloseBelowLowestLow.class);
-        assertThat(single.describe()).isEqualTo("收盤跌破前 5 日最低價");
+        assertThat(single.describe()).isEqualTo("收盤跌破前 5 日（一週）最低價");
 
         Condition both = ConditionFactory.entry(List.of(
                 rule(ConditionType.CLOSE_ABOVE_MOVING_AVERAGE, "20"),
                 rule(ConditionType.CLOSE_ABOVE_HIGHEST_HIGH, "10")));
         assertThat(both).isInstanceOf(AllOf.class);
-        assertThat(both.describe()).isEqualTo("收盤站上 20 日均線，而且收盤突破前 10 日最高價");
+        assertThat(both.describe()).isEqualTo("收盤站上 20 日線（月線），而且收盤突破前 10 日（兩週）最高價");
     }
 
     @Test
@@ -93,6 +93,29 @@ class ConditionFactoryTest {
     void decimals() {
         assertThat(ConditionType.STOP_LOSS.create(new BigDecimal("2.5")).describe()).isEqualTo("跌 2.5% 停損");
         assertThat(ConditionType.CLOSE_BELOW_LOWEST_LOW.create(new BigDecimal("5.0")).describe())
-                .isEqualTo("收盤跌破前 5 日最低價");
+                .isEqualTo("收盤跌破前 5 日（一週）最低價");
+    }
+
+    @Test
+    @DisplayName("均線與高低點提供常用天數選單；停利停損、持有天數讓使用者自己輸入")
+    void options() {
+        assertThat(ConditionType.CLOSE_ABOVE_MOVING_AVERAGE.options())
+                .extracting(ConditionType.Option::label)
+                .containsExactly("5 日線（週線）", "10 日線（雙週線）", "20 日線（月線）",
+                        "60 日線（季線）", "120 日線（半年線）", "240 日線（年線）");
+        assertThat(ConditionType.CLOSE_BELOW_LOWEST_LOW.options())
+                .extracting(ConditionType.Option::value)
+                .containsExactly(5, 10, 20, 60, 120, 240);
+        assertThat(ConditionType.STOP_LOSS.options()).isEmpty();
+        assertThat(ConditionType.HOLDING_DAYS.options()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("不是常用天數時，說明文字照樣顯示天數")
+    void uncommonDays() {
+        assertThat(ConditionType.CLOSE_ABOVE_MOVING_AVERAGE.create(new BigDecimal("17")).describe())
+                .isEqualTo("收盤站上 17 日均線");
+        assertThat(ConditionType.CLOSE_ABOVE_HIGHEST_HIGH.create(new BigDecimal("3")).describe())
+                .isEqualTo("收盤突破前 3 日最高價");
     }
 }

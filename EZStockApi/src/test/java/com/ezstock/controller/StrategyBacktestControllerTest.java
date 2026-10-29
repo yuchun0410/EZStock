@@ -47,7 +47,9 @@ class StrategyBacktestControllerTest {
         mockMvc.perform(get("/api/backtests/conditions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].type").value("CLOSE_BELOW_LOWEST_LOW"))
-                .andExpect(jsonPath("$[0].label").value("收盤跌破前 N 日最低價"))
+                .andExpect(jsonPath("$[0].label").value("收盤跌破近期最低價"))
+                .andExpect(jsonPath("$[0].options[2].value").value(20))
+                .andExpect(jsonPath("$[0].options[2].label").value("前 20 日（一個月）"))
                 .andExpect(jsonPath("$[0].unit").value("日"))
                 .andExpect(jsonPath("$[0].entryAllowed").value(true));
     }
