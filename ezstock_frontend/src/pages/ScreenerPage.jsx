@@ -97,8 +97,9 @@ function ScreenerPage() {
                   name="scope"
                   checked={scope === 'watchlist'}
                   onChange={() => setScope('watchlist')}
+                  disabled={!watchlist.signedIn}
                 />
-                自選股（{watchlist.items.length} 檔）
+                {watchlist.signedIn ? `自選股（${watchlist.items.length} 檔）` : '自選股（登入後可用）'}
               </label>
             </span>
             {scope === 'watchlist' && watchlistEmpty && (

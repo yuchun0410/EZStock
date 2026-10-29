@@ -2,10 +2,12 @@ package com.ezstock.dao;
 
 import com.ezstock.model.DailyPrice;
 import com.ezstock.model.Dividend;
+import com.ezstock.model.Member;
 import com.ezstock.model.Stock;
 import com.ezstock.model.SplitType;
 import com.ezstock.model.StockSplit;
 import com.ezstock.model.StockType;
+import com.ezstock.model.WatchlistItem;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,6 +46,12 @@ abstract class AbstractDaoTest {
 
     @Autowired
     protected StockSplitDao stockSplitDao;
+
+    @Autowired
+    protected MemberDao memberDao;
+
+    @Autowired
+    protected WatchlistDao watchlistDao;
 
     private Stock stock;
 
@@ -140,6 +149,67 @@ abstract class AbstractDaoTest {
                     assertThat(s.getBeforePrice()).isEqualByComparingTo("188.65");
                     assertThat(s.shareRatio()).isEqualByComparingTo("4");
                 });
+    }
+
+    @Test
+    @DisplayName("會員：新增後拿到 id，Email 不分大小寫，綁定 Google 與登入時間可以更新")
+    void member() {
+        LocalDateTime now = LocalDateTime.of(2026, 10, 29, 11, 0);
+        Member created = memberDao.save(Member.withPassword(" Test.User@Example.com ", "$2a$10$hash", "測試會員", now));
+
+        assertThat(created.getId()).isNotNull();
+        Member found = memberDao.findByEmail("TEST.USER@example.COM").orElseThrow();
+        assertThat(found.getId()).isEqualTo(created.getId());
+        assertThat(found.getEmail()).isEqualTo("test.user@example.com");
+        assertThat(found.hasPassword()).isTrue();
+        assertThat(found.getGoogleSub()).isNull();
+
+        found.linkGoogle("google-sub-123", "https://example.com/a.png");
+        found.recordLogin(now.plusHours(1));
+        memberDao.save(found);
+
+        Member linked = memberDao.findByGoogleSub("google-sub-123").orElseThrow();
+        assertThat(linked.getId()).isEqualTo(created.getId());
+        assertThat(linked.getAvatarUrl()).isEqualTo("https://example.com/a.png");
+        assertThat(linked.getLastLoginAt()).isEqualTo(now.plusHours(1));
+        assertThat(memberDao.findById(created.getId())).isPresent();
+        assertThat(memberDao.findByEmail("nobody@example.com")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("會員：Google 登入建立的會員沒有密碼")
+    void googleMember() {
+        Member created = memberDao.save(Member.withGoogle("g@example.com", "google-sub-456", "Google 會員",
+                "https://example.com/g.png", LocalDateTime.of(2026, 10, 29, 11, 0)));
+
+        Member found = memberDao.findByGoogleSub("google-sub-456").orElseThrow();
+        assertThat(found.getId()).isEqualTo(created.getId());
+        assertThat(found.hasPassword()).isFalse();
+        assertThat(found.getDisplayName()).isEqualTo("Google 會員");
+    }
+
+    @Test
+    @DisplayName("自選股：新增後查得到股票名稱，重複新增不出錯，可以移除")
+    void watchlist() {
+        Member member = memberDao.save(Member.withPassword("watch@example.com", "hash", "自選股測試",
+                LocalDateTime.of(2026, 10, 29, 11, 0)));
+        Stock second = new Stock("TEST02", "測試股票二", StockType.ETF, "測試產業");
+        stockDao.save(second);
+        LocalDateTime t = LocalDateTime.of(2026, 10, 29, 12, 0);
+
+        assertThat(watchlistDao.add(new WatchlistItem(member.getId(), second, t.plusMinutes(1)))).isTrue();
+        assertThat(watchlistDao.add(new WatchlistItem(member.getId(), stock, t))).isTrue();
+        assertThat(watchlistDao.add(new WatchlistItem(member.getId(), stock, t.plusHours(1)))).isFalse();
+
+        List<WatchlistItem> items = watchlistDao.findByMember(member.getId());
+        assertThat(items).extracting(item -> item.getStock().getStockId()).containsExactly(TEST_STOCK_ID, "TEST02");
+        assertThat(items.get(1).getStock().getName()).isEqualTo("測試股票二");
+        assertThat(items.get(0).getAddedAt()).isEqualTo(t);
+
+        assertThat(watchlistDao.remove(member.getId(), TEST_STOCK_ID)).isTrue();
+        assertThat(watchlistDao.remove(member.getId(), TEST_STOCK_ID)).isFalse();
+        assertThat(watchlistDao.findByMember(member.getId())).extracting(item -> item.getStock().getStockId())
+                .containsExactly("TEST02");
     }
 
     private DailyPrice price(LocalDate date, String open, String close) {

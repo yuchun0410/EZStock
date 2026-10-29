@@ -444,8 +444,123 @@
   font-weight: 600;
 }
 
+/* ---------- 頁首右上角：登入狀態 ---------- */
+.account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 56px;
+  justify-content: flex-end;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-accent);
+  color: var(--color-primary);
+  font-size: 0.85rem;
+  font-weight: 700;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.account-name {
+  max-width: 8em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+
+.header-button {
+  padding: 5px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 6px;
+  background: transparent;
+  color: #fff;
+  font-size: 0.85rem;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.header-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ---------- 登入、註冊 ---------- */
+.auth-card {
+  max-width: 400px;
+  margin: 24px auto;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-form .form-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.auth-submit {
+  align-self: stretch;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 14px;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--color-border);
+}
+
+.google-button {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+}
+
+.auth-switch {
+  margin: 16px 0 0;
+  text-align: center;
+}
+
 @media (max-width: 560px) {
   .tagline {
+    display: none;
+  }
+
+  .header-inner {
+    flex-wrap: wrap;
+  }
+
+  .nav {
+    order: 3;
+    width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+  }
+
+  .account {
+    margin-left: auto;
+  }
+
+  .account-name {
     display: none;
   }
 }

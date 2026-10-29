@@ -52,6 +52,19 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, "BAD_REQUEST", e.getMessage());
     }
 
+    /** 只記原因，不記帳號、密碼、token */
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ApiError> handleUnauthorized(UnauthorizedException e) {
+        log.warn("驗證失敗：{}", e.getMessage());
+        return build(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", e.getMessage());
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiError> handleConflict(ConflictException e) {
+        log.warn("資料衝突：{}", e.getMessage());
+        return build(HttpStatus.CONFLICT, "CONFLICT", e.getMessage());
+    }
+
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ApiError> handleMissingParameter(MissingServletRequestParameterException e) {
         String message = "缺少參數 " + e.getParameterName();
