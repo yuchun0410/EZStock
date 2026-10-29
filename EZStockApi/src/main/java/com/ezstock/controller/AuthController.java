@@ -1,6 +1,8 @@
 package com.ezstock.controller;
 
 import com.ezstock.config.RequestLoggingFilter;
+import com.ezstock.dto.AuthProvidersResponse;
+import com.ezstock.dto.GoogleLoginRequest;
 import com.ezstock.dto.LoginRequest;
 import com.ezstock.dto.RegisterRequest;
 import com.ezstock.dto.TokenResponse;
@@ -17,6 +19,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -53,6 +56,18 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
         return withTokens(HttpStatus.OK, authService.login(request));
+    }
+
+    /** Google 登入：前端把 Google 按鈕給的 ID Token 送來，後端驗證後發我們自己的 JWT */
+    @PostMapping("/google")
+    public ResponseEntity<TokenResponse> google(@Valid @RequestBody GoogleLoginRequest request) {
+        return withTokens(HttpStatus.OK, authService.loginWithGoogle(request.credential()));
+    }
+
+    /** 登入頁要顯示哪些登入方式（例如有沒有 Google 按鈕、用哪個用戶端 ID） */
+    @GetMapping("/providers")
+    public AuthProvidersResponse providers() {
+        return authService.providers();
     }
 
     /**

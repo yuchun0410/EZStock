@@ -25,6 +25,11 @@ ezstock.jwt.refresh-token-ttl=7d
 # refresh token 的 cookie 只走 HTTPS；本機是 http 所以 false，上線一定要改 true
 ezstock.jwt.cookie-secure=false
 
+# ---------- Google 登入 ----------
+# Google Cloud Console → Google Auth Platform → 用戶端 → 網頁應用程式，JavaScript 來源填 http://localhost:5173
+# 空白代表不開放 Google 登入（登入頁不會顯示 Google 按鈕）
+ezstock.google.client-id=
+
 finmind.api.url=https://api.finmindtrade.com/api/v4/data
 finmind.api.token=YOUR_FINMIND_TOKEN
 

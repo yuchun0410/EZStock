@@ -9,6 +9,8 @@ import com.ezstock.exception.UnauthorizedException;
 import com.ezstock.model.Member;
 import com.ezstock.security.AccessToken;
 import com.ezstock.security.AccessTokenBlacklist;
+import com.ezstock.security.GoogleIdTokenVerifier;
+import com.ezstock.security.GoogleUser;
 import com.ezstock.security.RefreshTokenStore;
 import com.ezstock.security.TokenService;
 import com.ezstock.service.AuthService.AuthResult;
@@ -55,6 +57,7 @@ class AuthServiceImplTest {
     private RefreshTokenStore refreshTokenStore;
     private AccessTokenBlacklist blacklist;
     private JwtDecoder jwtDecoder;
+    private GoogleIdTokenVerifier googleVerifier;
     private AuthServiceImpl service;
 
     @BeforeEach
@@ -64,10 +67,13 @@ class AuthServiceImplTest {
         refreshTokenStore = mock(RefreshTokenStore.class);
         blacklist = mock(AccessTokenBlacklist.class);
         jwtDecoder = mock(JwtDecoder.class);
+        googleVerifier = mock(GoogleIdTokenVerifier.class);
         Clock clock = Clock.fixed(NOW, ZoneId.of("Asia/Taipei"));
-        service = new AuthServiceImpl(memberDao, encoder, tokenService, refreshTokenStore, blacklist, jwtDecoder, clock);
+        service = new AuthServiceImpl(memberDao, encoder, tokenService, refreshTokenStore, blacklist, jwtDecoder,
+                googleVerifier, clock);
 
         when(memberDao.findByEmail(anyString())).thenReturn(Optional.empty());
+        when(memberDao.findByGoogleSub(anyString())).thenReturn(Optional.empty());
         when(memberDao.save(any())).thenAnswer(invocation -> {
             Member member = invocation.getArgument(0);
             if (member.getId() == null) {
@@ -203,6 +209,73 @@ class AuthServiceImplTest {
 
         verify(refreshTokenStore).revoke("refresh");
         verify(blacklist, never()).revoke(any(), any());
+    }
+
+    @Test
+    @DisplayName("Google 登入：第一次登入，建立沒有密碼的新會員，名稱與頭像用 Google 的")
+    void googleNewMember() {
+        when(googleVerifier.verify("id-token"))
+                .thenReturn(new GoogleUser("g-sub", "G.User@gmail.com", true, "Google 小明", "https://pic"));
+
+        AuthResult result = service.loginWithGoogle("id-token");
+
+        ArgumentCaptor<Member> saved = ArgumentCaptor.forClass(Member.class);
+        verify(memberDao).save(saved.capture());
+        Member member = saved.getValue();
+        assertThat(member.getEmail()).isEqualTo("g.user@gmail.com");
+        assertThat(member.getGoogleSub()).isEqualTo("g-sub");
+        assertThat(member.getDisplayName()).isEqualTo("Google 小明");
+        assertThat(member.getAvatarUrl()).isEqualTo("https://pic");
+        assertThat(member.hasPassword()).isFalse();
+        assertThat(result.refreshToken()).isEqualTo("refresh-1");
+    }
+
+    @Test
+    @DisplayName("Google 登入：同 Email 的既有會員，綁定 Google 帳號，密碼保留")
+    void googleLinksExistingMember() {
+        Member existing = member("a@example.com", PASSWORD);
+        when(memberDao.findByEmail("a@example.com")).thenReturn(Optional.of(existing));
+        when(googleVerifier.verify("id-token"))
+                .thenReturn(new GoogleUser("g-sub", "a@example.com", true, "小明", "https://pic"));
+
+        service.loginWithGoogle("id-token");
+
+        assertThat(existing.getGoogleSub()).isEqualTo("g-sub");
+        assertThat(existing.hasPassword()).isTrue();
+        verify(memberDao).save(existing);
+        verify(refreshTokenStore).issue(7L);
+    }
+
+    @Test
+    @DisplayName("Google 登入：已經綁定過，用 Google 帳號編號找到會員（就算 Google 的 Email 改了）")
+    void googleExistingLink() {
+        Member linked = Member.withGoogle("old@gmail.com", "g-sub", "小明", null, LocalDateTime.now());
+        ReflectionTestUtils.setField(linked, "id", 9L);
+        when(memberDao.findByGoogleSub("g-sub")).thenReturn(Optional.of(linked));
+        when(googleVerifier.verify("id-token"))
+                .thenReturn(new GoogleUser("g-sub", "new@gmail.com", true, "小明", null));
+
+        service.loginWithGoogle("id-token");
+
+        verify(refreshTokenStore).issue(9L);
+        verify(memberDao, never()).findByEmail(anyString());
+    }
+
+    @Test
+    @DisplayName("Google 登入：Email 沒經 Google 驗證不能登入；同 Email 已綁其他 Google 帳號回 409")
+    void googleRejected() {
+        when(googleVerifier.verify("unverified"))
+                .thenReturn(new GoogleUser("g-1", "a@example.com", false, "小明", null));
+        assertThatThrownBy(() -> service.loginWithGoogle("unverified")).isInstanceOf(UnauthorizedException.class);
+
+        Member other = Member.withGoogle("a@example.com", "g-other", "小明", null, LocalDateTime.now());
+        ReflectionTestUtils.setField(other, "id", 10L);
+        when(memberDao.findByEmail("a@example.com")).thenReturn(Optional.of(other));
+        when(googleVerifier.verify("id-token"))
+                .thenReturn(new GoogleUser("g-2", "a@example.com", true, "小明", null));
+        assertThatThrownBy(() -> service.loginWithGoogle("id-token")).isInstanceOf(ConflictException.class);
+
+        verify(refreshTokenStore, never()).issue(anyLong());
     }
 
     private Member member(String email, String password) {

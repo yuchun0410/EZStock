@@ -1,6 +1,7 @@
 package com.ezstock.service.impl;
 
 import com.ezstock.dao.MemberDao;
+import com.ezstock.dto.AuthProvidersResponse;
 import com.ezstock.dto.LoginRequest;
 import com.ezstock.dto.MemberResponse;
 import com.ezstock.dto.RegisterRequest;
@@ -11,6 +12,8 @@ import com.ezstock.exception.UnauthorizedException;
 import com.ezstock.model.Member;
 import com.ezstock.security.AccessToken;
 import com.ezstock.security.AccessTokenBlacklist;
+import com.ezstock.security.GoogleIdTokenVerifier;
+import com.ezstock.security.GoogleUser;
 import com.ezstock.security.LogMasks;
 import com.ezstock.security.RefreshTokenStore;
 import com.ezstock.security.TokenService;
@@ -39,12 +42,15 @@ public class AuthServiceImpl implements AuthService {
     /** BCrypt 只看前 72 個 byte，超過的部分會被忽略（中文一個字 3 byte） */
     private static final int BCRYPT_MAX_BYTES = 72;
 
+    private static final int DISPLAY_NAME_MAX = 50;
+
     private final MemberDao memberDao;
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
     private final RefreshTokenStore refreshTokenStore;
     private final AccessTokenBlacklist blacklist;
     private final JwtDecoder jwtDecoder;
+    private final GoogleIdTokenVerifier googleVerifier;
     private final Clock clock;
 
     /** Email 不存在時也跑一次 BCrypt，讓回應時間跟「密碼錯」差不多，避免用時間差猜出帳號存不存在 */
@@ -52,13 +58,14 @@ public class AuthServiceImpl implements AuthService {
 
     public AuthServiceImpl(MemberDao memberDao, PasswordEncoder passwordEncoder, TokenService tokenService,
                            RefreshTokenStore refreshTokenStore, AccessTokenBlacklist blacklist,
-                           JwtDecoder jwtDecoder, Clock clock) {
+                           JwtDecoder jwtDecoder, GoogleIdTokenVerifier googleVerifier, Clock clock) {
         this.memberDao = memberDao;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
         this.refreshTokenStore = refreshTokenStore;
         this.blacklist = blacklist;
         this.jwtDecoder = jwtDecoder;
+        this.googleVerifier = googleVerifier;
         this.clock = clock;
         this.dummyHash = passwordEncoder.encode("dummy-password-for-timing");
     }
@@ -113,6 +120,62 @@ public class AuthServiceImpl implements AuthService {
         memberDao.save(member);
         log.info("[會員] 登入成功 id={}", member.getId());
         return issueTokens(member);
+    }
+
+    @Override
+    public AuthResult loginWithGoogle(String credential) {
+        GoogleUser google = googleVerifier.verify(credential);
+        if (google.email() == null || !google.emailVerified()) {
+            log.info("[會員] Google 登入失敗：Email 尚未經 Google 驗證");
+            throw new UnauthorizedException("這個 Google 帳號的 Email 尚未驗證，無法登入");
+        }
+
+        LocalDateTime now = LocalDateTime.now(clock);
+        Member member = memberDao.findByGoogleSub(google.subject()).orElse(null);
+        if (member != null) {
+            log.info("[會員] Google 登入 id={}", member.getId());
+        } else {
+            member = memberDao.findByEmail(google.email()).orElse(null);
+            if (member != null) {
+                if (member.getGoogleSub() != null) {
+                    // 同一個 Email 已經綁了另一個 Google 帳號（很少見，例如 Google 帳號刪掉重建）
+                    log.warn("[會員] Google 登入失敗：會員 id={} 已綁定其他 Google 帳號", member.getId());
+                    throw new ConflictException("這個 Email 已經綁定另一個 Google 帳號");
+                }
+                // Google 已確認 Email 屬於本人，所以可以綁定同 Email 的既有帳號。
+                // 注意：目前註冊沒有驗證 Email，有人可能先用別人的 Email 註冊。之後要加「註冊寄驗證信」補上這個洞。
+                member.linkGoogle(google.subject(), google.pictureUrl());
+                log.info("[會員] 既有會員 id={} 綁定 Google 帳號", member.getId());
+            } else {
+                member = Member.withGoogle(google.email(), google.subject(), displayNameOf(google),
+                        google.pictureUrl(), now);
+                log.info("[會員] 第一次用 Google 登入，建立新會員 {}", LogMasks.email(google.email()));
+            }
+        }
+
+        member.recordLogin(now);
+        try {
+            memberDao.save(member);
+        } catch (DataIntegrityViolationException e) {
+            // 同一個 Google 帳號同時送兩次登入，第二個會撞到唯一索引
+            log.info("[會員] Google 登入失敗：同時有另一個登入請求");
+            throw new ConflictException("登入處理中，請再試一次");
+        }
+        log.info("[會員] Google 登入成功 id={}", member.getId());
+        return issueTokens(member);
+    }
+
+    @Override
+    public AuthProvidersResponse providers() {
+        return new AuthProvidersResponse(googleVerifier.enabled() ? googleVerifier.clientId() : null);
+    }
+
+    /** Google 沒給名稱就用 Email @ 前面那段，太長就截斷 */
+    private static String displayNameOf(GoogleUser google) {
+        String name = google.name() == null || google.name().isBlank()
+                ? google.email().substring(0, google.email().indexOf('@'))
+                : google.name().trim();
+        return name.length() > DISPLAY_NAME_MAX ? name.substring(0, DISPLAY_NAME_MAX) : name;
     }
 
     @Override

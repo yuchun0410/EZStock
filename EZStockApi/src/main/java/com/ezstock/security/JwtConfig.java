@@ -24,7 +24,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
  * JWT 的簽發（JwtEncoder，用私鑰）與驗證（JwtDecoder，用公鑰），演算法固定 RS256。
  */
 @Configuration
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, GoogleProperties.class})
 public class JwtConfig {
 
     private static final Logger log = LoggerFactory.getLogger(JwtConfig.class);
