@@ -37,6 +37,19 @@ public final class ConditionFactory {
         return new AnyOf(create(rules));
     }
 
+    /** 這組規則最多需要幾個交易日的歷史資料（例如有季線就是 60） */
+    public static int lookbackDays(List<ConditionRule> rules) {
+        return rules.stream().mapToInt(rule -> rule.type().lookbackDays(rule.value())).max().orElse(0);
+    }
+
+    /**
+     * 需要 N 個交易日的資料時，要往前抓幾個「日曆天」：交易日大約是日曆天的 2/3（扣掉週末、連假），
+     * 所以抓 N × 1.5 + 14 天，例如年線 240 日 → 往前抓 374 天。
+     */
+    public static int warmupCalendarDays(int tradingDays) {
+        return tradingDays == 0 ? 0 : (int) Math.ceil(tradingDays * 1.5) + 14;
+    }
+
     private static List<Condition> create(List<ConditionRule> rules) {
         return rules.stream().map(rule -> rule.type().create(rule.value())).toList();
     }

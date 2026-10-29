@@ -25,7 +25,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Stream;
 
 /**
  * 條件回測：把表單上的規則交給 {@link ConditionFactory} 變成 Condition，
@@ -36,14 +35,6 @@ import java.util.stream.Stream;
 public class StrategyBacktestServiceImpl implements StrategyBacktestService {
 
     private static final Logger log = LoggerFactory.getLogger(StrategyBacktestServiceImpl.class);
-
-    /**
-     * 往前多抓幾個「日曆天」來算指標：交易日大約是日曆天的 2/3（扣掉週末、連假），
-     * 所以需要 N 個交易日時抓 N × 1.5 + 14 天，例如年線 240 日 → 往前抓 374 天。
-     */
-    static int warmupCalendarDays(int tradingDays) {
-        return tradingDays == 0 ? 0 : (int) Math.ceil(tradingDays * 1.5) + 14;
-    }
 
     private final BacktestDataLoader dataLoader;
 
@@ -72,10 +63,9 @@ public class StrategyBacktestServiceImpl implements StrategyBacktestService {
         }
 
         BacktestDataLoader.Period period = dataLoader.resolvePeriod(request.startDate(), request.endDate());
-        int lookback = Stream.concat(request.entryConditions().stream(), request.exitConditions().stream())
-                .mapToInt(spec -> spec.type().lookbackDays(spec.value()))
-                .max().orElse(0);
-        LocalDate loadFrom = period.start().minusDays(warmupCalendarDays(lookback));
+        int lookback = Math.max(ConditionFactory.lookbackDays(toRules(request.entryConditions())),
+                ConditionFactory.lookbackDays(toRules(request.exitConditions())));
+        LocalDate loadFrom = period.start().minusDays(ConditionFactory.warmupCalendarDays(lookback));
         BacktestDataLoader.StockData data = dataLoader.load(stockId,
                 new BacktestDataLoader.Period(loadFrom, period.end()));
         // 對照組「一直持有」從起始日開始，不包含暖機的資料
