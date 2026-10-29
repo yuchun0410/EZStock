@@ -31,6 +31,8 @@ logging.level.com.ezstock=DEBUG
 # JPA / Hibernate 執行的 SQL 與參數
 logging.level.org.hibernate.SQL=DEBUG
 logging.level.org.hibernate.orm.jdbc.bind=INFO
+# 會員的 SQL 參數有 Email、密碼雜湊，不印出來（MyBatis 的 SQL log 跟著 mapper 的 logger 走）
+logging.level.com.ezstock.dao.mybatis.mapper.MemberMapper=INFO
 # 同時寫進檔案，位置在 EZStockApi/logs/ezstock.log
 logging.file.name=logs/ezstock.log
 # 每行 log 加上請求編號 traceId（同一個請求的 log 編號相同）

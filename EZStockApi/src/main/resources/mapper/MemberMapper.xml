@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ezstock.dao.mybatis.mapper.MemberMapper">
+
+    <resultMap id="memberMap" type="Member">
+        <id     property="id"           column="id"/>
+        <result property="email"        column="email"/>
+        <result property="passwordHash" column="password_hash"/>
+        <result property="googleSub"    column="google_sub"/>
+        <result property="displayName"  column="display_name"/>
+        <result property="avatarUrl"    column="avatar_url"/>
+        <result property="createdAt"    column="created_at"/>
+        <result property="lastLoginAt"  column="last_login_at"/>
+    </resultMap>
+
+    <sql id="columns">
+        id, email, password_hash, google_sub, display_name, avatar_url, created_at, last_login_at
+    </sql>
+
+    <select id="findById" resultMap="memberMap">
+        SELECT <include refid="columns"/> FROM member WHERE id = #{id}
+    </select>
+
+    <select id="findByEmail" resultMap="memberMap">
+        SELECT <include refid="columns"/> FROM member WHERE email = #{email}
+    </select>
+
+    <select id="findByGoogleSub" resultMap="memberMap">
+        SELECT <include refid="columns"/> FROM member WHERE google_sub = #{googleSub}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO member (email, password_hash, google_sub, display_name, avatar_url, created_at, last_login_at)
+        VALUES (#{email}, #{passwordHash}, #{googleSub}, #{displayName}, #{avatarUrl}, #{createdAt}, #{lastLoginAt})
+    </insert>
+
+    <!-- Email 和建立時間不會變，不更新 -->
+    <update id="update">
+        UPDATE member
+        SET password_hash = #{passwordHash},
+            google_sub    = #{googleSub},
+            display_name  = #{displayName},
+            avatar_url    = #{avatarUrl},
+            last_login_at = #{lastLoginAt}
+        WHERE id = #{id}
+    </update>
+</mapper>
