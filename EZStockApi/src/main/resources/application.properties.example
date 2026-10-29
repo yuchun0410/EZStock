@@ -15,6 +15,13 @@ spring.data.redis.timeout=2s
 # 只用 RedisTemplate 存取，不用 Redis Repository，關掉啟動時的掃描（不然會對每個 JPA Repository 印一行 INFO）
 spring.data.redis.repositories.enabled=false
 
+# ---------- JWT（RS256）----------
+# 私鑰不要寫在這裡！請在 IntelliJ 的 Run Configuration → Environment variables 設定：
+#   EZSTOCK_JWT_PRIVATE_KEY=<PKCS#8 私鑰，去掉 BEGIN/END 那兩行、接成一行的 Base64>
+# 沒設定的話，啟動時會自動產生一把臨時金鑰（重開後先前發的 token 全部失效，只適合測試）
+ezstock.jwt.issuer=ezstock
+ezstock.jwt.access-token-ttl=15m
+
 finmind.api.url=https://api.finmindtrade.com/api/v4/data
 finmind.api.token=YOUR_FINMIND_TOKEN
 

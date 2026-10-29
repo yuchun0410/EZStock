@@ -39,6 +39,11 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
+		<!-- Spring Security + JWT 驗證（resource server 內含 Nimbus，可以簽發和驗證 RS256 JWT） -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
+		</dependency>
 		<!-- Redis：存 refresh token、登出黑名單、登入失敗次數這類「有時效」的資料 -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
