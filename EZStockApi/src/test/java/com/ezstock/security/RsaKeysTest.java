@@ -47,7 +47,7 @@ class RsaKeysTest {
     @DisplayName("toString 不印私鑰")
     void toStringHidesKey() {
         assertThat(generated.toString()).startsWith("RsaKeys[keyId=").doesNotContain(base64.substring(0, 20));
-        assertThat(new JwtProperties(base64, null, null).toString())
+        assertThat(new JwtProperties(base64, null, null, null, false).toString())
                 .contains("已設定").doesNotContain(base64.substring(0, 20));
     }
 }

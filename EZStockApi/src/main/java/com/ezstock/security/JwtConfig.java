@@ -8,7 +8,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
@@ -47,13 +52,20 @@ public class JwtConfig {
         return new NimbusJwtEncoder(new ImmutableJWKSet<>(new JWKSet(jwk)));
     }
 
-    /** 只接受 RS256，並檢查效期與發行者（iss）；不接受 none 或 HS256 這類被竄改的 header */
+    /**
+     * 只接受 RS256，並檢查效期、發行者（iss），以及有沒有被登出（黑名單）。
+     * 不接受 none 或 HS256 這類被竄改的 header。
+     */
     @Bean
-    public JwtDecoder jwtDecoder(RsaKeys keys, JwtProperties properties) {
+    public JwtDecoder jwtDecoder(RsaKeys keys, JwtProperties properties, AccessTokenBlacklist blacklist) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey(keys.publicKey())
                 .signatureAlgorithm(SignatureAlgorithm.RS256)
                 .build();
-        decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(properties.issuer()));
+        OAuth2TokenValidator<Jwt> notRevoked = jwt -> blacklist.isRevoked(jwt.getId())
+                ? OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "token 已登出", null))
+                : OAuth2TokenValidatorResult.success();
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefaultWithIssuer(properties.issuer()), notRevoked));
         return decoder;
     }
 }

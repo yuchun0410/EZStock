@@ -21,6 +21,9 @@ spring.data.redis.repositories.enabled=false
 # 沒設定的話，啟動時會自動產生一把臨時金鑰（重開後先前發的 token 全部失效，只適合測試）
 ezstock.jwt.issuer=ezstock
 ezstock.jwt.access-token-ttl=15m
+ezstock.jwt.refresh-token-ttl=7d
+# refresh token 的 cookie 只走 HTTPS；本機是 http 所以 false，上線一定要改 true
+ezstock.jwt.cookie-secure=false
 
 finmind.api.url=https://api.finmindtrade.com/api/v4/data
 finmind.api.token=YOUR_FINMIND_TOKEN
