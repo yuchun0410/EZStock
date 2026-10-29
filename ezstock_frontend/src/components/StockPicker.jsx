@@ -54,7 +54,7 @@ function StockPicker({ selected, onChange, max }) {
         <input
           className="search-input"
           type="search"
-          placeholder={isFull ? `最多比較 ${max} 檔` : '搜尋代號或名稱加入比較，例如 0050、台積'}
+          placeholder={placeholder(isFull, max)}
           value={input}
           disabled={isFull}
           onChange={(event) => {
@@ -100,6 +100,11 @@ function StockPicker({ selected, onChange, max }) {
       )}
     </div>
   )
+}
+
+function placeholder(isFull, max) {
+  if (!isFull) return max === 1 ? '搜尋代號或名稱，例如 0050、台積' : '搜尋代號或名稱加入比較，例如 0050、台積'
+  return max === 1 ? '要換股票，請先按上面的 ✕ 移除' : `最多比較 ${max} 檔`
 }
 
 export default StockPicker

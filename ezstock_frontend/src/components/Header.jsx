@@ -15,6 +15,9 @@ function Header() {
           <NavLink to="/backtest/compare" className="nav-link">
             標的比較
           </NavLink>
+          <NavLink to="/backtest/strategy" className="nav-link">
+            條件回測
+          </NavLink>
         </nav>
       </div>
     </header>

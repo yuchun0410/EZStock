@@ -672,3 +672,95 @@
 .assumptions ul {
   padding-left: 20px;
 }
+
+/* ---------- 條件回測 ---------- */
+.condition-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.condition-editor {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.condition-editor legend {
+  padding: 0 4px;
+}
+
+.condition-editor .form-hint {
+  margin: 0 0 8px;
+}
+
+.condition-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.condition-type {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 0.9rem;
+}
+
+.condition-period {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 0.9rem;
+}
+
+.condition-unit {
+  min-width: 1.5em;
+  font-size: 0.9rem;
+}
+
+.condition-error {
+  flex-basis: 100%;
+}
+
+.strategy-rules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+}
+
+.strategy-verdict {
+  margin: 0 0 16px;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.summary-table th[scope='row'] {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.summary-table .strong {
+  font-weight: 700;
+}
+
+.trades-title {
+  margin-top: 20px;
+}
+
+.table tr.is-open {
+  background: #fdf5e1;
+}
+
+@media (max-width: 720px) {
+  .nav-link {
+    padding: 6px 8px;
+    font-size: 0.85rem;
+  }
+}
