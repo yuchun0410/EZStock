@@ -180,6 +180,56 @@ class ImportServiceImplTest {
     }
 
     @Test
+    @DisplayName("更新：從資料庫最新一筆的隔天抓到今天")
+    void updateStockFromLatest() {
+        when(dailyPriceDao.findLatest("2330")).thenReturn(Optional.of(price(LocalDate.of(2026, 10, 23))));
+
+        createService(List.of()).updateStock("2330");
+
+        verify(dataSource).fetchPrices("2330", LocalDate.of(2026, 10, 24), TODAY);
+        verify(dataSource).fetchCashDividends("2330", LocalDate.of(2026, 10, 24), TODAY);
+    }
+
+    @Test
+    @DisplayName("更新：已經是最新的就不呼叫外部資料來源")
+    void updateStockAlreadyLatest() {
+        when(dailyPriceDao.findLatest("2330")).thenReturn(Optional.of(price(TODAY)));
+
+        StockImportResult result = createService(List.of()).updateStock("2330");
+
+        assertThat(result.pricesInserted()).isZero();
+        verify(dataSource, never()).fetchPrices(anyString(), any(), any());
+    }
+
+    @Test
+    @DisplayName("更新：資料庫沒有這檔的價格，改成完整匯入")
+    void updateStockWithoutPrices() {
+        when(dailyPriceDao.findLatest("2330")).thenReturn(Optional.empty());
+
+        createService(List.of()).updateStock("2330");
+
+        verify(dataSource).fetchPrices("2330", TODAY.minusYears(5), TODAY);
+    }
+
+    @Test
+    @DisplayName("每日更新：資料庫裡每一檔都更新，某一檔失敗不影響其他檔")
+    void updateAllContinuesAfterFailure() {
+        when(dailyPriceDao.findStockIdsWithPrices()).thenReturn(List.of("2330", "2317"));
+        when(dailyPriceDao.findLatest(anyString())).thenReturn(Optional.of(price(LocalDate.of(2026, 10, 26))));
+        when(dataSource.fetchPrices(eq("2330"), any(), any()))
+                .thenThrow(new FinMindApiException("FinMind 呼叫失敗：HTTP 402"));
+        when(dataSource.fetchPrices(eq("2317"), any(), any()))
+                .thenReturn(List.of(bar(LocalDate.of(2026, 10, 27))));
+
+        ImportResult result = createService(List.of()).updateAll();
+
+        assertThat(result.failed()).containsExactly("2330");
+        assertThat(result.succeeded()).extracting(StockImportResult::stockId).containsExactly("2317");
+        assertThat(result.totalPricesInserted()).isEqualTo(1);
+        verify(dataSource, never()).fetchStockInfos();
+    }
+
+    @Test
     @DisplayName("全部匯入：股票清單全部存，某一檔失敗不影響其他檔")
     void importAllContinuesAfterFailure() {
         when(dataSource.fetchStockInfos()).thenReturn(List.of(
@@ -198,6 +248,11 @@ class ImportServiceImplTest {
         assertThat(result.failed()).containsExactly("2317");
         assertThat(result.succeeded()).extracting(StockImportResult::stockId).containsExactly("2330", "0050");
         assertThat(result.totalPricesInserted()).isEqualTo(1);
+    }
+
+    private DailyPrice price(LocalDate date) {
+        BigDecimal p = new BigDecimal("100.00");
+        return new DailyPrice(new Stock("2330", "台積電", StockType.STOCK, "半導體業"), date, p, p, p, p, 1_000L);
     }
 
     private PriceBar bar(LocalDate date) {
