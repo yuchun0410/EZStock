@@ -16,6 +16,8 @@ public interface DailyPriceMapper {
 
     DailyPrice findLatest(@Param("stockId") String stockId);
 
+    List<String> findStockIdsWithPrices();
+
     List<LocalDate> findTradeDates(@Param("stockId") String stockId,
                                    @Param("from") LocalDate from,
                                    @Param("to") LocalDate to);

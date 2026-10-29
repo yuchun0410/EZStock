@@ -17,6 +17,9 @@ public interface DailyPriceDao {
     /** 某檔股票最新一筆日線 */
     Optional<DailyPrice> findLatest(String stockId);
 
+    /** 資料庫裡有價格資料的股票代號（每日更新、條件選股的範圍） */
+    List<String> findStockIdsWithPrices();
+
     /** 某段期間已存在的交易日，匯入前用來過濾重複資料 */
     List<LocalDate> findTradeDates(String stockId, LocalDate from, LocalDate to);
 

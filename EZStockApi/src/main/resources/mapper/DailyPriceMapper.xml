@@ -37,6 +37,12 @@
         LIMIT 1
     </select>
 
+    <select id="findStockIdsWithPrices" resultType="string">
+        SELECT DISTINCT stock_id
+        FROM daily_price
+        ORDER BY stock_id
+    </select>
+
     <select id="findTradeDates" resultType="java.time.LocalDate">
         SELECT trade_date
         FROM daily_price

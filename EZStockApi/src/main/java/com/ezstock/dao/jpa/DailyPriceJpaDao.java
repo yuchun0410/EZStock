@@ -45,6 +45,14 @@ public class DailyPriceJpaDao implements DailyPriceDao {
     }
 
     @Override
+    public List<String> findStockIdsWithPrices() {
+        log.debug("[JPA] 查詢有價格資料的股票");
+        List<String> result = dailyPriceRepository.findStockIdsWithPrices();
+        log.debug("[JPA] 查詢有價格資料的股票 共 {} 檔", result.size());
+        return result;
+    }
+
+    @Override
     public List<LocalDate> findTradeDates(String stockId, LocalDate from, LocalDate to) {
         log.debug("[JPA] 查詢已存在交易日 stockId={} 期間 {} ~ {}", stockId, from, to);
         List<LocalDate> result = dailyPriceRepository.findTradeDates(stockId, from, to);
