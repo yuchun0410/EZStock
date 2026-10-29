@@ -1,3 +1,5 @@
+### 使用方式：由上往下依序執行。accessToken 是「登入」那一步存起來的變數，沒先登入，後面帶 token 的請求會跳出 unsubstituted variable
+
 ### 註冊（成功會直接登入，回應 body 有 accessToken，refresh token 在 Set-Cookie）
 POST http://localhost:8080/api/auth/register
 Content-Type: application/json
@@ -17,7 +19,7 @@ Content-Type: application/json
   "password": "demo-password-123"
 }
 
-> {% client.global.set("accessToken", response.body.accessToken); %}
+> {% if (response.status === 200) { client.global.set("accessToken", response.body.accessToken); } %}
 
 ### 查自己的資料（要帶 access token）
 GET http://localhost:8080/api/members/me
@@ -38,7 +40,7 @@ Content-Type: application/json
 ### 換新 token（IntelliJ 會自動帶上前面拿到的 cookie）
 POST http://localhost:8080/api/auth/refresh
 
-> {% client.global.set("accessToken", response.body.accessToken); %}
+> {% if (response.status === 200) { client.global.set("accessToken", response.body.accessToken); } %}
 
 ### 登出：refresh token 作廢、access token 加入黑名單
 POST http://localhost:8080/api/auth/logout
