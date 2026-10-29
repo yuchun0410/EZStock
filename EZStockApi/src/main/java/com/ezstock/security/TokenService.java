@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 /**
@@ -35,7 +36,8 @@ public class TokenService {
     }
 
     public AccessToken issueAccessToken(Member member) {
-        Instant now = clock.instant();
+        // JWT 的時間只到「秒」，先去掉毫秒，回傳的 expiresAt 才會跟 token 裡的 exp 完全一樣
+        Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
         Instant expiresAt = now.plus(properties.accessTokenTtl());
         String id = UUID.randomUUID().toString();
         JwtClaimsSet claims = JwtClaimsSet.builder()
