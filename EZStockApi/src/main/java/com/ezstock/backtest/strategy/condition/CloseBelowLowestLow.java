@@ -24,6 +24,6 @@ public class CloseBelowLowestLow implements Condition {
 
     @Override
     public String describe() {
-        return "收盤跌破前 " + days + " 日最低價";
+        return "收盤跌破" + PeriodNames.period(days) + "最低價";
     }
 }

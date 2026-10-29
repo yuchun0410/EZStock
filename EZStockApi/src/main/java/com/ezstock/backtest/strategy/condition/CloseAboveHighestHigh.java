@@ -24,6 +24,6 @@ public class CloseAboveHighestHigh implements Condition {
 
     @Override
     public String describe() {
-        return "收盤突破前 " + days + " 日最高價";
+        return "收盤突破" + PeriodNames.period(days) + "最高價";
     }
 }

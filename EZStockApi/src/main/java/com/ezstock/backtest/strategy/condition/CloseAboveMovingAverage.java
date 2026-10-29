@@ -24,6 +24,6 @@ public class CloseAboveMovingAverage implements Condition {
 
     @Override
     public String describe() {
-        return "收盤站上 " + days + " 日均線";
+        return "收盤站上 " + PeriodNames.movingAverage(days);
     }
 }
