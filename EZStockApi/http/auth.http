@@ -1,0 +1,49 @@
+### 註冊（成功會直接登入，回應 body 有 accessToken，refresh token 在 Set-Cookie）
+POST http://localhost:8080/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "demo@example.com",
+  "password": "demo-password-123",
+  "displayName": "示範帳號"
+}
+
+### 登入，把 accessToken 存起來給下面用
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "demo@example.com",
+  "password": "demo-password-123"
+}
+
+> {% client.global.set("accessToken", response.body.accessToken); %}
+
+### 查自己的資料（要帶 access token）
+GET http://localhost:8080/api/members/me
+Authorization: Bearer {{accessToken}}
+
+### 沒帶 token：應該回 401
+GET http://localhost:8080/api/members/me
+
+### 密碼錯誤：應該回 401「Email 或密碼錯誤」
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "demo@example.com",
+  "password": "wrong-password"
+}
+
+### 換新 token（IntelliJ 會自動帶上前面拿到的 cookie）
+POST http://localhost:8080/api/auth/refresh
+
+> {% client.global.set("accessToken", response.body.accessToken); %}
+
+### 登出：refresh token 作廢、access token 加入黑名單
+POST http://localhost:8080/api/auth/logout
+Authorization: Bearer {{accessToken}}
+
+### 登出後再用同一個 access token：應該回 401
+GET http://localhost:8080/api/members/me
+Authorization: Bearer {{accessToken}}
