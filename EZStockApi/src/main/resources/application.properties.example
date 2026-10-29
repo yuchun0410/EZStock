@@ -7,6 +7,14 @@ spring.datasource.password=YOUR_DB_PASSWORD
 spring.jpa.hibernate.ddl-auto=validate
 spring.jpa.open-in-view=false
 
+# ---------- Redis ----------
+# 本機用 Homebrew 安裝：brew install redis && brew services start redis
+spring.data.redis.host=localhost
+spring.data.redis.port=6379
+spring.data.redis.timeout=2s
+# 只用 RedisTemplate 存取，不用 Redis Repository，關掉啟動時的掃描（不然會對每個 JPA Repository 印一行 INFO）
+spring.data.redis.repositories.enabled=false
+
 finmind.api.url=https://api.finmindtrade.com/api/v4/data
 finmind.api.token=YOUR_FINMIND_TOKEN
 
