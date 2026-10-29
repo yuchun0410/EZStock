@@ -58,7 +58,9 @@ class BacktestServiceImplTest {
         stockSplitDao = mock(StockSplitDao.class);
         priceLoader = mock(PriceLoader.class);
         Clock clock = Clock.fixed(Instant.parse("2026-10-28T02:00:00Z"), ZoneId.of("Asia/Taipei"));
-        service = new BacktestServiceImpl(stockDao, dailyPriceDao, dividendDao, stockSplitDao, priceLoader, clock);
+        // 資料載入器用真的，只把它底下的 DAO 換成 Mockito 假物件
+        service = new BacktestServiceImpl(
+                new BacktestDataLoader(stockDao, dailyPriceDao, dividendDao, stockSplitDao, priceLoader, clock));
 
         when(stockDao.findById("AAAA")).thenReturn(Optional.of(a));
         when(stockDao.findById("BBBB")).thenReturn(Optional.of(b));

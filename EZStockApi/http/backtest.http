@@ -41,3 +41,38 @@ Content-Type: application/json
   "startDate": "2022-01-03",
   "initialCapital": 500000
 }
+
+### 條件回測可以選的條件種類
+GET http://localhost:8080/api/backtests/conditions
+
+### 條件回測：0050 破 5 日低點買進，漲 10% 停利或跌 5% 停損或持有 20 天
+POST http://localhost:8080/api/backtests/strategy
+Content-Type: application/json
+
+{
+  "stockId": "0050",
+  "startDate": "2022-01-03",
+  "initialCapital": 500000,
+  "entryConditions": [
+    { "type": "CLOSE_BELOW_LOWEST_LOW", "value": 5 }
+  ],
+  "exitConditions": [
+    { "type": "TAKE_PROFIT", "value": 10 },
+    { "type": "STOP_LOSS", "value": 5 },
+    { "type": "HOLDING_DAYS", "value": 20 }
+  ],
+  "includeCosts": true,
+  "feeDiscount": 0.6
+}
+
+### 錯誤：停利不能當買進條件（應該回 400）
+POST http://localhost:8080/api/backtests/strategy
+Content-Type: application/json
+
+{
+  "stockId": "0050",
+  "startDate": "2022-01-03",
+  "initialCapital": 500000,
+  "entryConditions": [ { "type": "TAKE_PROFIT", "value": 10 } ],
+  "exitConditions": [ { "type": "STOP_LOSS", "value": 5 } ]
+}
