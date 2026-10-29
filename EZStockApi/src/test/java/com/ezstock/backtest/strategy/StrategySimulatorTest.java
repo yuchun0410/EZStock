@@ -114,6 +114,35 @@ class StrategySimulatorTest {
     }
 
     @Test
+    @DisplayName("股利再投入：持有中除息，用當天收盤價加碼，賣出時一起算損益")
+    void reinvestDividends() {
+        List<Dividend> dividends = List.of(new Dividend(STOCK, DAY1.plusDays(4), new BigDecimal("2")));
+
+        StrategyResult result = noCost.simulate(STOCK, winningTrade, dividends, List.of(), entry, exit,
+                CAPITAL, null, true);
+
+        // 1041 股 × 2 = 2,082；現金 64 + 2,082 = 2,146，以收盤 106 加碼 20 股（2,120），剩 26
+        // 賣出 1061 股 × 107 = 113,527，期末現金 113,553
+        assertThat(result.trades().getFirst().shares()).isEqualTo(1061);
+        assertThat(result.finalValue()).isEqualByComparingTo("113553");
+        // 損益 = 113,527 + 股利 2,082 - 成本（99,936 + 2,120）= 13,553，跟期末資產 - 本金一致
+        assertThat(result.trades().getFirst().profit()).isEqualByComparingTo("13553");
+    }
+
+    @Test
+    @DisplayName("暖機：起始日之前的資料只拿來算指標，第一天就能判斷條件，資產曲線從起始日開始")
+    void warmup() {
+        // 前 2 天是暖機資料；從第 3 天開始交易，第 3 天收盤 95 就跌破前 2 日低點
+        StrategyResult result = noCost.simulate(STOCK, winningTrade, List.of(), List.of(), entry, exit,
+                CAPITAL, DAY1.plusDays(2), false);
+
+        assertThat(result.equityCurve()).hasSize(4);
+        assertThat(result.equityCurve().getFirst().date()).isEqualTo(DAY1.plusDays(2));
+        assertThat(result.trades()).singleElement()
+                .satisfies(trade -> assertThat(trade.entryDate()).isEqualTo(DAY1.plusDays(3)));
+    }
+
+    @Test
     @DisplayName("持有中遇到 1 拆 4：股數變 4 倍、買進價變 1/4，不會誤觸停損")
     void splitWhileHolding() {
         List<DailyPrice> prices = TestBars.ohlcList(

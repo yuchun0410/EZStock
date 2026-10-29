@@ -31,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -63,7 +64,8 @@ class StrategyBacktestServiceImplTest {
         when(stockSplitDao.findByStockAndDateRange(anyString(), any(), any())).thenReturn(List.of());
         // 第 3 天收盤 95 跌破前 2 日低點 → 第 4 天開盤 100 買進
         // 第 5 天收盤 111，比買進價 100 漲 11% → 第 6 天開盤 112 停利賣出
-        when(dailyPriceDao.findByStockAndDateRange("AAAA", START, TODAY)).thenReturn(prices(
+        // 條件會往前多抓資料暖機，所以起始日不固定，用 any()
+        when(dailyPriceDao.findByStockAndDateRange(eq("AAAA"), any(), eq(TODAY))).thenReturn(prices(
                 "100", "100", "95", "100", "111", "112"));
     }
 
@@ -80,6 +82,16 @@ class StrategyBacktestServiceImplTest {
         assertThat(response.strategy().trades().getFirst().exitReason()).isEqualTo("漲 10% 停利");
         assertThat(response.benchmark().stockId()).isEqualTo("AAAA");
         assertThat(response.assumptions()).anyMatch(text -> text.contains("隔天以開盤價成交"));
+    }
+
+    @Test
+    @DisplayName("用季線當條件時，往起始日之前多抓資料暖機（60 × 1.5 + 14 = 104 天）")
+    void warmup() {
+        service.run(request(
+                List.of(spec(ConditionType.CLOSE_ABOVE_MOVING_AVERAGE, "60")),
+                List.of(spec(ConditionType.STOP_LOSS, "5"))));
+
+        verify(dailyPriceDao).findByStockAndDateRange("AAAA", START.minusDays(104), TODAY);
     }
 
     @Test
@@ -117,7 +129,7 @@ class StrategyBacktestServiceImplTest {
     }
 
     private StrategyRequest request(List<ConditionSpec> entry, List<ConditionSpec> exit) {
-        return new StrategyRequest("AAAA", START, null, CAPITAL, entry, exit, false, null);
+        return new StrategyRequest("AAAA", START, null, CAPITAL, entry, exit, null, false, null);
     }
 
     private ConditionSpec spec(ConditionType type, String value) {
