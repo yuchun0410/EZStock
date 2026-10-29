@@ -7,6 +7,7 @@ import com.ezstock.model.Stock;
 import com.ezstock.model.SplitType;
 import com.ezstock.model.StockSplit;
 import com.ezstock.model.StockType;
+import com.ezstock.model.WatchlistItem;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,9 @@ abstract class AbstractDaoTest {
 
     @Autowired
     protected MemberDao memberDao;
+
+    @Autowired
+    protected WatchlistDao watchlistDao;
 
     private Stock stock;
 
@@ -182,6 +186,30 @@ abstract class AbstractDaoTest {
         assertThat(found.getId()).isEqualTo(created.getId());
         assertThat(found.hasPassword()).isFalse();
         assertThat(found.getDisplayName()).isEqualTo("Google 會員");
+    }
+
+    @Test
+    @DisplayName("自選股：新增後查得到股票名稱，重複新增不出錯，可以移除")
+    void watchlist() {
+        Member member = memberDao.save(Member.withPassword("watch@example.com", "hash", "自選股測試",
+                LocalDateTime.of(2026, 10, 29, 11, 0)));
+        Stock second = new Stock("TEST02", "測試股票二", StockType.ETF, "測試產業");
+        stockDao.save(second);
+        LocalDateTime t = LocalDateTime.of(2026, 10, 29, 12, 0);
+
+        assertThat(watchlistDao.add(new WatchlistItem(member.getId(), second, t.plusMinutes(1)))).isTrue();
+        assertThat(watchlistDao.add(new WatchlistItem(member.getId(), stock, t))).isTrue();
+        assertThat(watchlistDao.add(new WatchlistItem(member.getId(), stock, t.plusHours(1)))).isFalse();
+
+        List<WatchlistItem> items = watchlistDao.findByMember(member.getId());
+        assertThat(items).extracting(item -> item.getStock().getStockId()).containsExactly(TEST_STOCK_ID, "TEST02");
+        assertThat(items.get(1).getStock().getName()).isEqualTo("測試股票二");
+        assertThat(items.get(0).getAddedAt()).isEqualTo(t);
+
+        assertThat(watchlistDao.remove(member.getId(), TEST_STOCK_ID)).isTrue();
+        assertThat(watchlistDao.remove(member.getId(), TEST_STOCK_ID)).isFalse();
+        assertThat(watchlistDao.findByMember(member.getId())).extracting(item -> item.getStock().getStockId())
+                .containsExactly("TEST02");
     }
 
     private DailyPrice price(LocalDate date, String open, String close) {

@@ -49,3 +49,26 @@ Authorization: Bearer {{accessToken}}
 ### 登出後再用同一個 access token：應該回 401
 GET http://localhost:8080/api/members/me
 Authorization: Bearer {{accessToken}}
+
+### ---------- 自選股（要先執行上面的「登入」） ----------
+
+### 我的自選股
+GET http://localhost:8080/api/members/me/watchlist
+Authorization: Bearer {{accessToken}}
+
+### 加入 2330（重複加入不會出錯）
+PUT http://localhost:8080/api/members/me/watchlist/2330
+Authorization: Bearer {{accessToken}}
+
+### 移除 2330
+DELETE http://localhost:8080/api/members/me/watchlist/2330
+Authorization: Bearer {{accessToken}}
+
+### 匯入瀏覽器裡的自選股（已存在、查無的會略過）
+POST http://localhost:8080/api/members/me/watchlist/import
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "stockIds": ["0050", "2330", "9999"]
+}
