@@ -34,3 +34,8 @@ ezstock.import.stock-ids=2330,2317,2454,2303,2412,2882,2891,0050,0056,00878
 ezstock.import.years=5
 # true：啟動時自動匯入一次（匯入完記得改回 false）
 ezstock.import.run-on-startup=false
+
+# ---------- 每日更新 ----------
+# 週一到週五收盤後，把資料庫裡每一檔股票補上最新資料（秒 分 時 日 月 星期，台灣時間）
+ezstock.update.enabled=true
+ezstock.update.cron=0 30 17 * * MON-FRI

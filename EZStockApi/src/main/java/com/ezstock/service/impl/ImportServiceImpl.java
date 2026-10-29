@@ -30,6 +30,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -114,7 +115,52 @@ public class ImportServiceImpl implements ImportService {
     @Override
     public StockImportResult importStock(String stockId) {
         LocalDate to = LocalDate.now(clock);
-        LocalDate from = to.minusYears(properties.years());
+        return importRange(stockId, to.minusYears(properties.years()), to);
+    }
+
+    @Override
+    public StockImportResult updateStock(String stockId) {
+        LocalDate today = LocalDate.now(clock);
+        Optional<DailyPrice> latest = dailyPriceDao.findLatest(stockId);
+        if (latest.isEmpty()) {
+            log.info("更新 {}：資料庫沒有價格，改為完整匯入", stockId);
+            return importStock(stockId);
+        }
+        LocalDate from = latest.get().getTradeDate().plusDays(1);
+        if (from.isAfter(today)) {
+            log.debug("更新 {}：已經是最新（{}），不呼叫外部資料來源", stockId, latest.get().getTradeDate());
+            return new StockImportResult(stockId, 0, 0, 0, 0, 0);
+        }
+        log.info("更新 {}：資料庫最新是 {}，補抓 {} ~ {}", stockId, latest.get().getTradeDate(), from, today);
+        return importRange(stockId, from, today);
+    }
+
+    @Override
+    public ImportResult updateAll() {
+        long start = System.currentTimeMillis();
+        List<String> stockIds = dailyPriceDao.findStockIdsWithPrices();
+        log.info("每日更新開始：共 {} 檔 {}", stockIds.size(), stockIds);
+
+        List<StockImportResult> succeeded = new ArrayList<>();
+        List<String> failed = new ArrayList<>();
+        for (String stockId : stockIds) {
+            try {
+                succeeded.add(updateStock(stockId));
+            } catch (Exception e) {
+                failed.add(stockId);
+                log.error("每日更新 {} 失敗，略過這檔繼續下一檔：{}", stockId, e.getMessage(), e);
+            }
+        }
+
+        ImportResult result = new ImportResult(0, succeeded, failed, System.currentTimeMillis() - start);
+        log.info("每日更新完成：成功 {} 檔、失敗 {} 檔 {}；新增日線 {} 筆、股利 {} 筆、股票分割 {} 筆；耗時 {} 秒",
+                succeeded.size(), failed.size(), failed, result.totalPricesInserted(),
+                result.totalDividendsInserted(), result.totalSplitsInserted(), result.elapsedMillis() / 1000);
+        return result;
+    }
+
+    /** 匯入某段期間的日線、股利、分割，只新增資料庫還沒有的 */
+    private StockImportResult importRange(String stockId, LocalDate from, LocalDate to) {
         log.debug("匯入 {} 開始，期間 {} ~ {}", stockId, from, to);
 
         // 先在交易外呼叫外部 API：網路可能很慢，不要讓資料庫交易一直開著等
