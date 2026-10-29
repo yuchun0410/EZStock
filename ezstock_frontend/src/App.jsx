@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage'
 import StockPage from './pages/StockPage'
 import StrategyPage from './pages/StrategyPage'
 import NotFoundPage from './pages/NotFoundPage'
+import ScreenerPage from './pages/ScreenerPage'
 import './App.css'
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
           <Route path="/stocks/:stockId" element={<StockPage />} />
           <Route path="/backtest/compare" element={<ComparePage />} />
           <Route path="/backtest/strategy" element={<StrategyPage />} />
+          <Route path="/screener" element={<ScreenerPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>

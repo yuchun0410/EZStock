@@ -18,6 +18,9 @@ function Header() {
           <NavLink to="/backtest/strategy" className="nav-link">
             條件回測
           </NavLink>
+          <NavLink to="/screener" className="nav-link">
+            條件選股
+          </NavLink>
         </nav>
       </div>
     </header>
