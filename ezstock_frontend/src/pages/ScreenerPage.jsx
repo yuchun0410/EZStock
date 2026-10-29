@@ -54,6 +54,7 @@ function ScreenerPage() {
   async function handleSubmit(event) {
     event.preventDefault()
     if (!canSubmit) return
+    const submitted = conditions
     const request = {
       stockIds: scope === 'watchlist' ? watchlist.items.map((item) => item.stockId) : null,
       conditions: conditions.map((c) => ({ type: c.type, value: Number(c.value) })),
@@ -66,7 +67,7 @@ function ScreenerPage() {
         `[條件選股] 完成：掃描 ${response.scannedCount} 檔，符合 ${response.matches.length} 檔，` +
           `略過 ${response.skipped.length} 檔`,
       )
-      setState({ status: 'done', response, error: null })
+      setState({ status: 'done', response, conditions: submitted, error: null })
     } catch (error) {
       setState((current) => ({ ...current, status: 'error', error }))
     }
@@ -159,6 +160,7 @@ function ScreenerPage() {
                     <th className="num">收盤</th>
                     <th className="num">漲跌</th>
                     <th className="num">漲跌幅</th>
+                    <th aria-label="操作" />
                   </tr>
                 </thead>
                 <tbody>
@@ -175,6 +177,16 @@ function ScreenerPage() {
                       <td className={`num ${trendClass(m.change)}`}>{m.change == null ? '—' : formatSigned(m.change)}</td>
                       <td className={`num ${trendClass(m.change)}`}>
                         {m.changePercent == null ? '—' : `${formatSigned(m.changePercent)}%`}
+                      </td>
+                      <td>
+                        <Link
+                          to="/backtest/strategy"
+                          state={{ stock: { stockId: m.stockId, name: m.name }, entry: state.conditions }}
+                          className="chip"
+                          onClick={() => console.info(`[條件選股] 帶 ${m.stockId} ${m.name} 去條件回測`)}
+                        >
+                          回測
+                        </Link>
                       </td>
                     </tr>
                   ))}
@@ -193,6 +205,7 @@ function ScreenerPage() {
               </ul>
             </details>
           )}
+          <p className="muted">按「回測」會帶著這組條件去條件回測，看看這檔過去照條件買賣的表現。</p>
           <p className="muted">選股結果僅供參考，不構成投資建議。</p>
         </section>
       )}

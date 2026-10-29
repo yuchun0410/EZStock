@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router'
 import { getConditionTypes, runStrategy } from '../api/backtestApi'
 import ConditionEditor from '../components/ConditionEditor'
 import FeeSettings from '../components/FeeSettings'
@@ -45,19 +46,46 @@ const TEMPLATES = [
   },
 ]
 
+/**
+ * 從條件選股帶過來的買進條件，配一組合理的賣出條件：
+ * 均線類就跌破同一條均線賣出（加 8% 停損），其他找買進條件種類相同的範本，都沒有就用預設範本。
+ */
+function suggestExit(entry) {
+  const ma = entry.find((rule) => rule.type === 'CLOSE_ABOVE_MOVING_AVERAGE')
+  if (ma) {
+    return [
+      { type: 'CLOSE_BELOW_MOVING_AVERAGE', value: ma.value },
+      { type: 'STOP_LOSS', value: '8' },
+    ]
+  }
+  const template = TEMPLATES.find((t) => t.entry.some((rule) => rule.type === entry[0]?.type))
+  return (template ?? TEMPLATES[0]).exit
+}
+
 /** 條件回測：符合條件才買、符合條件才賣，跟一直持有比起來如何？ */
 function StrategyPage() {
   const today = toIsoDate(new Date())
+  // 從條件選股按「回測」過來時，location.state 會帶 { stock, entry }
+  const { state: navState } = useLocation()
+  const fromScreener = navState?.entry ? navState : null
   const [types, setTypes] = useState({ list: [], error: null })
-  const [stocks, setStocks] = useState([{ stockId: '0050', name: '元大台灣50' }])
+  const [stocks, setStocks] = useState(
+    fromScreener ? [fromScreener.stock] : [{ stockId: '0050', name: '元大台灣50' }],
+  )
   const [startDate, setStartDate] = useState(minusMonths(today, 36))
   const [capital, setCapital] = useState('500000')
-  const [entry, setEntry] = useState(TEMPLATES[0].entry)
-  const [exit, setExit] = useState(TEMPLATES[0].exit)
+  const [entry, setEntry] = useState(fromScreener ? fromScreener.entry : TEMPLATES[0].entry)
+  const [exit, setExit] = useState(fromScreener ? suggestExit(fromScreener.entry) : TEMPLATES[0].exit)
   const [reinvest, setReinvest] = useState(true)
   const [includeCosts, setIncludeCosts] = useState(true)
   const [feeDiscount, setFeeDiscount] = useState('6')
   const [state, setState] = useState({ status: 'idle', response: null, error: null })
+
+  useEffect(() => {
+    if (fromScreener) {
+      console.info(`[條件回測] 從條件選股帶入 ${fromScreener.stock.stockId} ${fromScreener.stock.name}`, fromScreener.entry)
+    }
+  }, [fromScreener])
 
   // 條件種類由後端決定，進頁面時抓一次
   useEffect(() => {
@@ -127,6 +155,12 @@ function StrategyPage() {
       <section className="card">
         <h2 className="section-title">條件回測</h2>
         <p className="muted compare-intro">設定買進和賣出的條件，看看照著條件進出，會不會比一直抱著更好？</p>
+
+        {fromScreener && (
+          <div className="notice" role="status">
+            已帶入條件選股的股票和買進條件，賣出條件是建議值，請確認後再按「開始回測」。
+          </div>
+        )}
 
         {types.error && <p className="error">無法取得條件種類：{types.error.message}</p>}
 
