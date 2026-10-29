@@ -76,3 +76,25 @@ Content-Type: application/json
   "entryConditions": [ { "type": "TAKE_PROFIT", "value": 10 } ],
   "exitConditions": [ { "type": "STOP_LOSS", "value": 5 } ]
 }
+
+### 條件選股：資料庫全部，收盤站上月線
+POST http://localhost:8080/api/screener
+Content-Type: application/json
+
+{
+  "conditions": [
+    { "type": "CLOSE_ABOVE_MOVING_AVERAGE", "value": 20 }
+  ]
+}
+
+### 條件選股：指定股票（例如自選股），站上季線且突破一個月高點
+POST http://localhost:8080/api/screener
+Content-Type: application/json
+
+{
+  "stockIds": ["2330", "0050", "2603"],
+  "conditions": [
+    { "type": "CLOSE_ABOVE_MOVING_AVERAGE", "value": 60 },
+    { "type": "CLOSE_ABOVE_HIGHEST_HIGH", "value": 20 }
+  ]
+}
