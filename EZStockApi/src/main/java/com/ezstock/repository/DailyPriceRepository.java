@@ -18,6 +18,10 @@ public interface DailyPriceRepository extends JpaRepository<DailyPrice, Long> {
     // 某檔股票最新一筆日線（個股頁顯示最新收盤用）
     Optional<DailyPrice> findFirstByStock_StockIdOrderByTradeDateDesc(String stockId);
 
+    // 有價格資料的股票代號，每日更新和條件選股用
+    @Query("SELECT DISTINCT p.stock.stockId FROM DailyPrice p ORDER BY p.stock.stockId")
+    List<String> findStockIdsWithPrices();
+
     // 只查日期，給匯入時判斷哪幾天已經存在
     @Query("""
             SELECT p.tradeDate FROM DailyPrice p

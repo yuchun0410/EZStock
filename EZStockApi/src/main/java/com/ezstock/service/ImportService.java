@@ -14,4 +14,13 @@ public interface ImportService {
 
     /** 只匯入一檔的日線與股利（股票必須已在股票清單中） */
     StockImportResult importStock(String stockId);
+
+    /**
+     * 補上一檔股票最新的資料：從資料庫最新一筆的隔天抓到今天。
+     * 已經是最新的就不呼叫外部 API；資料庫完全沒有這檔的價格時，等同 importStock。
+     */
+    StockImportResult updateStock(String stockId);
+
+    /** 每日更新：資料庫裡所有有價格的股票，各自補上最新資料。某一檔失敗不影響其他檔 */
+    ImportResult updateAll();
 }

@@ -47,6 +47,14 @@ public class DailyPriceMyBatisDao implements DailyPriceDao {
     }
 
     @Override
+    public List<String> findStockIdsWithPrices() {
+        log.debug("[MyBatis] 查詢有價格資料的股票");
+        List<String> result = dailyPriceMapper.findStockIdsWithPrices();
+        log.debug("[MyBatis] 查詢有價格資料的股票 共 {} 檔", result.size());
+        return result;
+    }
+
+    @Override
     public List<LocalDate> findTradeDates(String stockId, LocalDate from, LocalDate to) {
         log.debug("[MyBatis] 查詢已存在交易日 stockId={} 期間 {} ~ {}", stockId, from, to);
         List<LocalDate> result = dailyPriceMapper.findTradeDates(stockId, from, to);
