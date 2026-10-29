@@ -17,6 +17,19 @@ export async function login(request) {
   return tokenResponse.member
 }
 
+/** Google 登入：把 Google 按鈕給的 ID Token 交給後端驗證，後端發我們自己的 JWT */
+export async function loginWithGoogle(credential) {
+  const tokenResponse = await apiPost('/api/auth/google', { credential })
+  setSession(tokenResponse)
+  console.info(`[登入] Google 登入成功，會員 id=${tokenResponse.member.id}`)
+  return tokenResponse.member
+}
+
+/** 有開放哪些登入方式：{ googleClientId }，null 代表沒開放 Google 登入 */
+export function getAuthProviders() {
+  return apiGet('/api/auth/providers')
+}
+
 /** 登出：後端作廢 refresh token、把 access token 加入黑名單；就算後端失敗，前端也一律清掉登入狀態 */
 export async function logout() {
   try {

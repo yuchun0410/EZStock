@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { login } from '../api/authApi'
+import GoogleLoginButton from '../components/GoogleLoginButton'
 import { useAuth } from '../hooks/useAuth'
 
 /** 登入。成功後回到原本要去的頁面（從哪裡被導來登入，就回哪裡） */
@@ -12,6 +13,8 @@ function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [state, setState] = useState({ status: 'idle', error: null })
+  // 傳給 Google 按鈕的 callback 要固定，不然每次重新渲染都會重畫按鈕
+  const goBack = useCallback(() => navigate(from, { replace: true }), [navigate, from])
 
   if (isAuthenticated && state.status !== 'loading') {
     return <Navigate to={from} replace />
@@ -66,6 +69,7 @@ function LoginPage() {
           {state.status === 'loading' ? '登入中…' : '登入'}
         </button>
       </form>
+      <GoogleLoginButton onSuccess={goBack} />
       <p className="muted auth-switch">
         還沒有帳號？
         <Link to="/register" state={{ from }}>
