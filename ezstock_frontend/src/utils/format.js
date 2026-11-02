@@ -63,3 +63,10 @@ export function formatSignedMoney(value) {
   const number = Number(value)
   return (number > 0 ? '+' : '') + moneyFormat.format(number)
 }
+
+/** 後端的 "2026-11-02T14:10:32.035" → "2026/11/02 14:10"（後端已經是台灣時間，直接切字串，不經過時區轉換） */
+export function formatDateTime(value) {
+  if (!value) return '-'
+  const [date, time = ''] = String(value).split('T')
+  return `${date.replaceAll('-', '/')} ${time.slice(0, 5)}`.trim()
+}

@@ -1020,3 +1020,201 @@
   gap: 12px;
   margin-top: 16px;
 }
+
+/* ---------- 論壇 ---------- */
+.forum-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.forum-new {
+  align-self: center;
+  padding: 8px 20px;
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+
+.forum-filter {
+  margin: 8px 0 16px;
+}
+
+.post-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.post-item {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.post-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.post-title:hover {
+  color: var(--color-primary);
+}
+
+.post-excerpt {
+  margin: 4px 0 6px;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 0.85rem;
+}
+
+.stock-tag {
+  padding: 1px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.8rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.stock-tag:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.post-detail-title {
+  margin: 4px 0 8px;
+  font-size: 1.4rem;
+  overflow-wrap: anywhere;
+}
+
+/* 保留使用者打的換行；內容是一般文字，React 會跳脫，不會被當成 HTML */
+.post-content,
+.comment-content {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}
+
+.post-content {
+  margin-top: 16px;
+}
+
+.post-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.link-button.danger {
+  color: var(--color-up);
+}
+
+/* 「修改」是連結、「刪除」是按鈕，瀏覽器預設樣式不同，統一大小與底線 */
+.post-actions .link-button {
+  font-size: 0.95rem;
+  text-decoration: none;
+}
+
+.comment-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+}
+
+.comment-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.comment-content {
+  margin-top: 4px;
+}
+
+.comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comment-input,
+.post-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font: inherit;
+  line-height: 1.6;
+}
+
+.comment-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stock-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stock-tag-quote {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 文章內頁：標記股票的迷你走勢圖 */
+.sparkline-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.sparkline-card {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--color-surface);
+}
+
+.sparkline-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.sparkline-chart {
+  margin: 4px 0;
+}
+
+.sparkline-placeholder {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.sparkline-footer {
+  font-size: 0.8rem;
+}
