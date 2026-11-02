@@ -3,8 +3,10 @@ package com.ezstock.dao;
 import com.ezstock.model.DailyPrice;
 import com.ezstock.model.Dividend;
 import com.ezstock.model.AccountKind;
+import com.ezstock.model.Comment;
 import com.ezstock.model.Member;
 import com.ezstock.model.MoneyAccount;
+import com.ezstock.model.Post;
 import com.ezstock.model.Stock;
 import com.ezstock.model.SplitType;
 import com.ezstock.model.StockSplit;
@@ -61,6 +63,12 @@ abstract class AbstractDaoTest {
 
     @Autowired
     protected StockHoldingDao stockHoldingDao;
+
+    @Autowired
+    protected PostDao postDao;
+
+    @Autowired
+    protected CommentDao commentDao;
 
     private Stock stock;
 
@@ -273,6 +281,75 @@ abstract class AbstractDaoTest {
         assertThat(stockHoldingDao.delete(me.getId(), TEST_STOCK_ID)).isTrue();
         assertThat(stockHoldingDao.delete(me.getId(), TEST_STOCK_ID)).isFalse();
         assertThat(stockHoldingDao.findByMember(me.getId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("文章：新增、修改標記的股票、依股票篩選、分頁由新到舊、軟刪除後不出現在列表")
+    void post() {
+        LocalDateTime t = LocalDateTime.of(2026, 11, 2, 14, 0);
+        Member author = memberDao.save(Member.withPassword("post@example.com", "hash", "發文者", t));
+        stockDao.save(new Stock("TEST02", "測試股票二", StockType.ETF, "測試產業"));
+
+        Post first = postDao.save(new Post(author, "第一篇", "內容一", List.of(TEST_STOCK_ID), t));
+        Post second = postDao.save(new Post(author, "第二篇", "內容二", List.of(TEST_STOCK_ID, "TEST02"), t.plusMinutes(1)));
+        postDao.save(new Post(author, "第三篇", "內容三", List.of(), t.plusMinutes(2)));
+        assertThat(first.getId()).isNotNull();
+
+        PageResult<Post> taggedPage = postDao.findPage(TEST_STOCK_ID, 0, 10);
+        assertThat(taggedPage.items()).extracting(Post::getTitle).containsExactly("第二篇", "第一篇");
+        assertThat(taggedPage.total()).isEqualTo(2);
+        assertThat(taggedPage.items().get(0).getStockIds()).containsExactly(TEST_STOCK_ID, "TEST02");
+        assertThat(taggedPage.items().get(0).getAuthor().getDisplayName()).isEqualTo("發文者");
+
+        // 第 2 頁（page=1）、每頁 1 篇：由新到舊排第二的那篇
+        PageResult<Post> secondPage = postDao.findPage(TEST_STOCK_ID, 1, 1);
+        assertThat(secondPage.items()).extracting(Post::getTitle).containsExactly("第一篇");
+        assertThat(secondPage.total()).isEqualTo(2);
+
+        Post edited = postDao.findById(second.getId()).orElseThrow();
+        edited.edit("第二篇（改）", "新內容", List.of("TEST02"), t.plusHours(1));
+        postDao.save(edited);
+        Post reloaded = postDao.findById(second.getId()).orElseThrow();
+        assertThat(reloaded.getTitle()).isEqualTo("第二篇（改）");
+        assertThat(reloaded.getStockIds()).containsExactly("TEST02");
+        assertThat(postDao.findPage(TEST_STOCK_ID, 0, 10).items()).extracting(Post::getTitle)
+                .containsExactly("第一篇");
+
+        Post toDelete = postDao.findById(first.getId()).orElseThrow();
+        toDelete.delete(t.plusHours(2));
+        postDao.save(toDelete);
+        assertThat(postDao.findById(first.getId()).orElseThrow().isDeleted()).isTrue();
+        assertThat(postDao.findPage(null, 0, 10).items()).extracting(Post::getTitle)
+                .doesNotContain("第一篇");
+    }
+
+    @Test
+    @DisplayName("留言：依時間排序、含已刪除的，留言數用原子更新加減，修改文章不會蓋掉留言數")
+    void comment() {
+        LocalDateTime t = LocalDateTime.of(2026, 11, 2, 14, 0);
+        Member author = memberDao.save(Member.withPassword("comment@example.com", "hash", "留言者", t));
+        Post post = postDao.save(new Post(author, "標題", "內容", List.of(), t));
+
+        Comment c1 = commentDao.save(new Comment(post.getId(), author, "第一則", t.plusMinutes(1)));
+        commentDao.save(new Comment(post.getId(), author, "第二則", t.plusMinutes(2)));
+        postDao.addCommentCount(post.getId(), 1);
+        postDao.addCommentCount(post.getId(), 1);
+
+        Comment toDelete = commentDao.findById(c1.getId()).orElseThrow();
+        toDelete.delete(t.plusMinutes(3));
+        commentDao.save(toDelete);
+        postDao.addCommentCount(post.getId(), -1);
+
+        List<Comment> comments = commentDao.findByPost(post.getId());
+        assertThat(comments).extracting(Comment::getContent).containsExactly("第一則", "第二則");
+        assertThat(comments.get(0).isDeleted()).isTrue();
+        assertThat(comments.get(1).getAuthor().getDisplayName()).isEqualTo("留言者");
+
+        Post edited = postDao.findById(post.getId()).orElseThrow();
+        assertThat(edited.getCommentCount()).isEqualTo(1);
+        edited.edit("新標題", "新內容", List.of(), t.plusHours(1));
+        postDao.save(edited);
+        assertThat(postDao.findById(post.getId()).orElseThrow().getCommentCount()).isEqualTo(1);
     }
 
     private DailyPrice price(LocalDate date, String open, String close) {
