@@ -2,10 +2,13 @@ package com.ezstock.dao;
 
 import com.ezstock.model.DailyPrice;
 import com.ezstock.model.Dividend;
+import com.ezstock.model.AccountKind;
 import com.ezstock.model.Member;
+import com.ezstock.model.MoneyAccount;
 import com.ezstock.model.Stock;
 import com.ezstock.model.SplitType;
 import com.ezstock.model.StockSplit;
+import com.ezstock.model.StockHolding;
 import com.ezstock.model.StockType;
 import com.ezstock.model.WatchlistItem;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +55,12 @@ abstract class AbstractDaoTest {
 
     @Autowired
     protected WatchlistDao watchlistDao;
+
+    @Autowired
+    protected MoneyAccountDao moneyAccountDao;
+
+    @Autowired
+    protected StockHoldingDao stockHoldingDao;
 
     private Stock stock;
 
@@ -210,6 +219,60 @@ abstract class AbstractDaoTest {
         assertThat(watchlistDao.remove(member.getId(), TEST_STOCK_ID)).isFalse();
         assertThat(watchlistDao.findByMember(member.getId())).extracting(item -> item.getStock().getStockId())
                 .containsExactly("TEST02");
+    }
+
+    @Test
+    @DisplayName("現金與負債帳戶：新增、更新、只能查到和刪除自己的")
+    void moneyAccount() {
+        LocalDateTime t = LocalDateTime.of(2026, 11, 2, 12, 0);
+        Member me = memberDao.save(Member.withPassword("asset-me@example.com", "hash", "我", t));
+        Member other = memberDao.save(Member.withPassword("asset-other@example.com", "hash", "別人", t));
+
+        MoneyAccount debt = moneyAccountDao.save(
+                new MoneyAccount(me.getId(), AccountKind.LIABILITY, "信貸", new BigDecimal("300000"), t));
+        MoneyAccount cash = moneyAccountDao.save(
+                new MoneyAccount(me.getId(), AccountKind.CASH, "活存", new BigDecimal("120000.50"), t));
+        assertThat(cash.getId()).isNotNull();
+
+        cash.update("台新活存", new BigDecimal("150000"), t.plusDays(1));
+        moneyAccountDao.save(cash);
+
+        assertThat(moneyAccountDao.findByMember(me.getId()))
+                .extracting(MoneyAccount::getName)
+                .containsExactly("台新活存", "信貸");
+        MoneyAccount found = moneyAccountDao.findByIdAndMember(cash.getId(), me.getId()).orElseThrow();
+        assertThat(found.getBalance()).isEqualByComparingTo("150000");
+        assertThat(found.getUpdatedAt()).isEqualTo(t.plusDays(1));
+
+        // 別人用我的帳戶 id：查不到、刪不掉
+        assertThat(moneyAccountDao.findByIdAndMember(cash.getId(), other.getId())).isEmpty();
+        assertThat(moneyAccountDao.deleteByIdAndMember(cash.getId(), other.getId())).isFalse();
+
+        assertThat(moneyAccountDao.deleteByIdAndMember(debt.getId(), me.getId())).isTrue();
+        assertThat(moneyAccountDao.findByMember(me.getId())).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("股票持股：同一檔再存一次是更新，查得到股票名稱")
+    void stockHolding() {
+        LocalDateTime t = LocalDateTime.of(2026, 11, 2, 12, 0);
+        Member me = memberDao.save(Member.withPassword("holding@example.com", "hash", "我", t));
+
+        stockHoldingDao.upsert(new StockHolding(me.getId(), stock, 1000, new BigDecimal("100.5"), t));
+        stockHoldingDao.upsert(new StockHolding(me.getId(), stock, 2500, new BigDecimal("98.25"), t.plusDays(1)));
+
+        assertThat(stockHoldingDao.findByMember(me.getId()))
+                .singleElement()
+                .satisfies(h -> {
+                    assertThat(h.getStock().getName()).isEqualTo("測試股票");
+                    assertThat(h.getShares()).isEqualTo(2500);
+                    assertThat(h.getAverageCost()).isEqualByComparingTo("98.25");
+                    assertThat(h.getUpdatedAt()).isEqualTo(t.plusDays(1));
+                });
+
+        assertThat(stockHoldingDao.delete(me.getId(), TEST_STOCK_ID)).isTrue();
+        assertThat(stockHoldingDao.delete(me.getId(), TEST_STOCK_ID)).isFalse();
+        assertThat(stockHoldingDao.findByMember(me.getId())).isEmpty();
     }
 
     private DailyPrice price(LocalDate date, String open, String close) {

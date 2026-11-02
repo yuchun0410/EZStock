@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ezstock.dao.mybatis.mapper.MoneyAccountMapper">
+
+    <resultMap id="moneyAccountMap" type="MoneyAccount">
+        <id     property="id"        column="id"/>
+        <result property="memberId"  column="member_id"/>
+        <result property="kind"      column="kind"/>
+        <result property="name"      column="name"/>
+        <result property="balance"   column="balance"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="columns">id, member_id, kind, name, balance, updated_at</sql>
+
+    <select id="findByMember" resultMap="moneyAccountMap">
+        SELECT <include refid="columns"/> FROM money_account
+        WHERE member_id = #{memberId}
+        ORDER BY kind, id
+    </select>
+
+    <select id="findByIdAndMember" resultMap="moneyAccountMap">
+        SELECT <include refid="columns"/> FROM money_account
+        WHERE id = #{id} AND member_id = #{memberId}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO money_account (member_id, kind, name, balance, updated_at)
+        VALUES (#{memberId}, #{kind}, #{name}, #{balance}, #{updatedAt})
+    </insert>
+
+    <update id="update">
+        UPDATE money_account
+        SET name = #{name}, balance = #{balance}, updated_at = #{updatedAt}
+        WHERE id = #{id} AND member_id = #{memberId}
+    </update>
+
+    <delete id="deleteByIdAndMember">
+        DELETE FROM money_account WHERE id = #{id} AND member_id = #{memberId}
+    </delete>
+</mapper>
