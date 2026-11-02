@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router'
 import Header from './components/Header'
+import AssetPage from './pages/AssetPage'
 import ComparePage from './pages/ComparePage'
 import HomePage from './pages/HomePage'
 import StockPage from './pages/StockPage'
@@ -21,6 +22,7 @@ function App() {
           <Route path="/backtest/compare" element={<ComparePage />} />
           <Route path="/backtest/strategy" element={<StrategyPage />} />
           <Route path="/screener" element={<ScreenerPage />} />
+          <Route path="/assets" element={<AssetPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="*" element={<NotFoundPage />} />

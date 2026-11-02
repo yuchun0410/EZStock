@@ -444,6 +444,13 @@
   font-weight: 600;
 }
 
+/* 選單變多，中等寬度先藏標語，避免頁首擠成兩行 */
+@media (max-width: 900px) {
+  .tagline {
+    display: none;
+  }
+}
+
 /* ---------- 頁首右上角：登入狀態 ---------- */
 .account {
   display: flex;
@@ -878,4 +885,138 @@
     padding: 6px 8px;
     font-size: 0.85rem;
   }
+}
+
+/* ---------- 我的資產 ---------- */
+.asset-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 16px;
+}
+
+.asset-hero-value {
+  font-size: 2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.asset-percent {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* 資產配置長條：段與段之間留 2px 底色縫隙，兩端圓角 */
+.allocation {
+  margin: 0 0 8px;
+}
+
+.allocation-bar {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.allocation-segment {
+  min-width: 4px;
+}
+
+.allocation-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 10px;
+  font-size: 0.9rem;
+}
+
+.allocation-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.asset-section + .asset-section,
+.asset-accounts {
+  margin-top: 24px;
+}
+
+.asset-accounts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.asset-accounts .asset-section {
+  margin-top: 0;
+}
+
+.asset-section-total {
+  margin-left: 8px;
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+.account-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.account-row .form-input:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 不能叫 .account-name：頁首右上角的登入名稱已經用了這個 class（最多 8 個字寬），會互相影響 */
+.money-account-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.money-account-balance {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.account-add {
+  border-bottom: none;
+}
+
+.asset-actions {
+  text-align: right;
+}
+
+.asset-price-date {
+  font-size: 0.75rem;
+}
+
+.holding-input {
+  width: 150px;
+}
+
+.holding-form .primary-button {
+  align-self: flex-start;
+  margin-top: 22px;
+}
+
+.holding-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
 }

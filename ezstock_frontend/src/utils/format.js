@@ -56,3 +56,10 @@ export function formatMoney(value) {
 export function formatTenThousands(value) {
   return `${moneyFormat.format(Number(value) / 10000)} 萬`
 }
+
+/** 金額的漲跌（不顯示小數）：1420000 → "+1,420,000"、-500 → "-500" */
+export function formatSignedMoney(value) {
+  if (value == null) return '-'
+  const number = Number(value)
+  return (number > 0 ? '+' : '') + moneyFormat.format(number)
+}
