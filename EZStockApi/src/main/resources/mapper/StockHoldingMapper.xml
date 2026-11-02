@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ezstock.dao.mybatis.mapper.StockHoldingMapper">
+
+    <resultMap id="stockHoldingMap" type="StockHolding">
+        <result property="shares"      column="shares"/>
+        <result property="averageCost" column="average_cost"/>
+        <result property="updatedAt"   column="updated_at"/>
+        <association property="id" javaType="com.ezstock.model.StockHolding$Key">
+            <result property="memberId" column="member_id"/>
+            <result property="stockId"  column="stock_id"/>
+        </association>
+        <association property="stock" javaType="Stock">
+            <id     property="stockId"  column="stock_id"/>
+            <result property="name"     column="name"/>
+            <result property="type"     column="type"/>
+            <result property="industry" column="industry"/>
+        </association>
+    </resultMap>
+
+    <select id="findByMember" resultMap="stockHoldingMap">
+        SELECT h.member_id, h.stock_id, h.shares, h.average_cost, h.updated_at, s.name, s.type, s.industry
+        FROM stock_holding h
+        JOIN stock s ON s.stock_id = h.stock_id
+        WHERE h.member_id = #{memberId}
+        ORDER BY h.stock_id
+    </select>
+
+    <insert id="upsert">
+        INSERT INTO stock_holding (member_id, stock_id, shares, average_cost, updated_at)
+        VALUES (#{h.id.memberId}, #{h.id.stockId}, #{h.shares}, #{h.averageCost}, #{h.updatedAt})
+        ON DUPLICATE KEY UPDATE
+            shares       = VALUES(shares),
+            average_cost = VALUES(average_cost),
+            updated_at   = VALUES(updated_at)
+    </insert>
+
+    <delete id="delete">
+        DELETE FROM stock_holding WHERE member_id = #{memberId} AND stock_id = #{stockId}
+    </delete>
+</mapper>
