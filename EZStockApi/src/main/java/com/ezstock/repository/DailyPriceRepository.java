@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,6 +20,10 @@ public interface DailyPriceRepository extends JpaRepository<DailyPrice, Long> {
     Optional<DailyPrice> findFirstByStock_StockIdOrderByTradeDateDesc(String stockId);
 
     // 有價格資料的股票代號，每日更新和條件選股用
+    @Query("SELECT p FROM DailyPrice p WHERE p.stock.stockId IN :stockIds AND p.tradeDate >= :from "
+            + "ORDER BY p.stock.stockId, p.tradeDate")
+    List<DailyPrice> findByStocksSince(@Param("stockIds") Collection<String> stockIds, @Param("from") LocalDate from);
+
     @Query("SELECT DISTINCT p.stock.stockId FROM DailyPrice p ORDER BY p.stock.stockId")
     List<String> findStockIdsWithPrices();
 

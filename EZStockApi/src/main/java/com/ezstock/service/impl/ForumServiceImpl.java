@@ -1,6 +1,7 @@
 package com.ezstock.service.impl;
 
 import com.ezstock.dao.CommentDao;
+import com.ezstock.dao.DailyPriceDao;
 import com.ezstock.dao.MemberDao;
 import com.ezstock.dao.PageResult;
 import com.ezstock.dao.PostDao;
@@ -18,6 +19,7 @@ import com.ezstock.exception.ForbiddenException;
 import com.ezstock.exception.ResourceNotFoundException;
 import com.ezstock.exception.UnauthorizedException;
 import com.ezstock.model.Comment;
+import com.ezstock.model.DailyPrice;
 import com.ezstock.model.Member;
 import com.ezstock.model.Post;
 import com.ezstock.model.Stock;
@@ -27,9 +29,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -48,19 +55,23 @@ public class ForumServiceImpl implements ForumService {
 
     private static final Logger log = LoggerFactory.getLogger(ForumServiceImpl.class);
     private static final int EXCERPT_LENGTH = 120;
+    /** 只看最近 14 天的股價：要找到最新和前一個交易日，連假也夠用；太久沒交易的股票就不顯示漲跌 */
+    private static final int QUOTE_LOOKBACK_DAYS = 14;
 
     private final PostDao postDao;
     private final CommentDao commentDao;
     private final MemberDao memberDao;
     private final StockDao stockDao;
+    private final DailyPriceDao dailyPriceDao;
     private final Clock clock;
 
     public ForumServiceImpl(PostDao postDao, CommentDao commentDao, MemberDao memberDao, StockDao stockDao,
-                            Clock clock) {
+                            DailyPriceDao dailyPriceDao, Clock clock) {
         this.postDao = postDao;
         this.commentDao = commentDao;
         this.memberDao = memberDao;
         this.stockDao = stockDao;
+        this.dailyPriceDao = dailyPriceDao;
         this.clock = clock;
     }
 
@@ -71,12 +82,12 @@ public class ForumServiceImpl implements ForumService {
         }
         String filter = stockId == null || stockId.isBlank() ? null : stockId.trim().toUpperCase();
         PageResult<Post> result = postDao.findPage(filter, page, PAGE_SIZE);
-        Map<String, String> names = stockNames(result.items().stream()
+        Map<String, StockTag> quotes = stockTags(result.items().stream()
                 .flatMap(post -> post.getStockIds().stream()).collect(Collectors.toSet()));
 
         List<PostSummaryResponse> items = result.items().stream()
                 .map(post -> new PostSummaryResponse(post.getId(), post.getTitle(), excerpt(post.getContent()),
-                        AuthorResponse.from(post.getAuthor()), tags(post.getStockIds(), names),
+                        AuthorResponse.from(post.getAuthor()), tags(post.getStockIds(), quotes),
                         post.getCommentCount(), post.getCreatedAt(), isEdited(post)))
                 .toList();
         int totalPages = (int) ((result.total() + PAGE_SIZE - 1) / PAGE_SIZE);
@@ -161,9 +172,8 @@ public class ForumServiceImpl implements ForumService {
                         comment.getContent(), false, comment.getCreatedAt(),
                         viewerId != null && comment.isWrittenBy(viewerId)))
                 .toList();
-        Map<String, String> names = stockNames(post.getStockIds());
         return new PostDetailResponse(post.getId(), post.getTitle(), post.getContent(),
-                AuthorResponse.from(post.getAuthor()), tags(post.getStockIds(), names),
+                AuthorResponse.from(post.getAuthor()), tags(post.getStockIds(), stockTags(post.getStockIds())),
                 (int) comments.stream().filter(c -> !c.deleted()).count(),
                 post.getCreatedAt(), post.getUpdatedAt(), isEdited(post),
                 viewerId != null && post.isWrittenBy(viewerId), comments);
@@ -211,8 +221,46 @@ public class ForumServiceImpl implements ForumService {
                 .collect(Collectors.toMap(Stock::getStockId, Stock::getName, (a, b) -> a));
     }
 
-    private static List<StockTag> tags(Collection<String> stockIds, Map<String, String> names) {
-        return stockIds.stream().map(id -> new StockTag(id, names.getOrDefault(id, id))).toList();
+    private static List<StockTag> tags(Collection<String> stockIds, Map<String, StockTag> quotes) {
+        return stockIds.stream()
+                .map(id -> quotes.getOrDefault(id, new StockTag(id, id, null, null, null, null)))
+                .toList();
+    }
+
+    /**
+     * 每檔股票的名稱與最新漲跌。不管一頁有幾檔，都只用兩句 SQL：一句查名稱、一句查最近的日線。
+     */
+    private Map<String, StockTag> stockTags(Collection<String> stockIds) {
+        if (stockIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> names = stockNames(stockIds);
+        Map<String, List<DailyPrice>> pricesByStock = new HashMap<>();
+        LocalDate from = LocalDate.now(clock).minusDays(QUOTE_LOOKBACK_DAYS);
+        for (DailyPrice price : dailyPriceDao.findByStocksSince(names.keySet(), from)) {
+            pricesByStock.computeIfAbsent(price.getStock().getStockId(), id -> new ArrayList<>()).add(price);
+        }
+
+        Map<String, StockTag> tags = new HashMap<>();
+        names.forEach((id, name) -> tags.put(id, quote(id, name, pricesByStock.getOrDefault(id, List.of()))));
+        return tags;
+    }
+
+    /** prices 依日期由舊到新；最後一筆是最新收盤，跟倒數第二筆比算漲跌 */
+    static StockTag quote(String stockId, String name, List<DailyPrice> prices) {
+        if (prices.isEmpty()) {
+            return new StockTag(stockId, name, null, null, null, null);
+        }
+        DailyPrice latest = prices.get(prices.size() - 1);
+        BigDecimal close = latest.getClosePrice();
+        if (prices.size() < 2) {
+            return new StockTag(stockId, name, close, null, null, latest.getTradeDate());
+        }
+        BigDecimal previous = prices.get(prices.size() - 2).getClosePrice();
+        BigDecimal change = close.subtract(previous);
+        BigDecimal percent = previous.signum() == 0 ? null
+                : change.multiply(BigDecimal.valueOf(100)).divide(previous, 2, RoundingMode.HALF_UP);
+        return new StockTag(stockId, name, close, change, percent, latest.getTradeDate());
     }
 
     private static boolean isEdited(Post post) {

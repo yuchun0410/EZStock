@@ -132,6 +132,10 @@ abstract class AbstractDaoTest {
         assertThat(dailyPriceDao.findTradeDates(TEST_STOCK_ID, d1, d2))
                 .containsExactlyInAnyOrder(d1, d2);
 
+        assertThat(dailyPriceDao.findByStocksSince(List.of(TEST_STOCK_ID, "NOPE99"), d2))
+                .extracting(DailyPrice::getTradeDate)
+                .containsExactly(d2);
+
         // 同一檔有兩天的價格，代號只出現一次
         assertThat(dailyPriceDao.findStockIdsWithPrices()).containsOnlyOnce(TEST_STOCK_ID);
     }

@@ -1,6 +1,7 @@
 package com.ezstock.service.impl;
 
 import com.ezstock.dao.CommentDao;
+import com.ezstock.dao.DailyPriceDao;
 import com.ezstock.dao.MemberDao;
 import com.ezstock.dao.PageResult;
 import com.ezstock.dao.PostDao;
@@ -14,6 +15,7 @@ import com.ezstock.exception.BadRequestException;
 import com.ezstock.exception.ForbiddenException;
 import com.ezstock.exception.ResourceNotFoundException;
 import com.ezstock.model.Comment;
+import com.ezstock.model.DailyPrice;
 import com.ezstock.model.Member;
 import com.ezstock.model.Post;
 import com.ezstock.model.Stock;
@@ -25,7 +27,9 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Collection;
@@ -37,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -53,6 +58,7 @@ class ForumServiceImplTest {
     private CommentDao commentDao;
     private MemberDao memberDao;
     private StockDao stockDao;
+    private DailyPriceDao dailyPriceDao;
     private ForumServiceImpl service;
 
     @BeforeEach
@@ -61,8 +67,9 @@ class ForumServiceImplTest {
         commentDao = mock(CommentDao.class);
         memberDao = mock(MemberDao.class);
         stockDao = mock(StockDao.class);
+        dailyPriceDao = mock(DailyPriceDao.class);
         Clock clock = Clock.fixed(Instant.parse("2026-11-02T07:00:00Z"), ZoneId.of("Asia/Taipei"));
-        service = new ForumServiceImpl(postDao, commentDao, memberDao, stockDao, clock);
+        service = new ForumServiceImpl(postDao, commentDao, memberDao, stockDao, dailyPriceDao, clock);
 
         when(memberDao.findById(1L)).thenReturn(Optional.of(alice));
         when(memberDao.findById(2L)).thenReturn(Optional.of(bob));
@@ -194,6 +201,32 @@ class ForumServiceImplTest {
         assertThat(asAuthor.editable()).isTrue();
         assertThat(asAuthor.comments().get(0).deletable()).isTrue();
         verify(postDao, never()).addCommentCount(anyLong(), anyInt());
+    }
+
+    @Test
+    @DisplayName("股票標籤：附上最新收盤與漲跌幅，只查一次日線；沒有股價的不顯示漲跌")
+    void stockQuote() {
+        Stock tsmc = new Stock("2330", "台積電", StockType.STOCK, "半導體業");
+        when(dailyPriceDao.findByStocksSince(any(), any())).thenReturn(List.of(
+                price(tsmc, LocalDate.of(2026, 10, 29), "2340"),
+                price(tsmc, LocalDate.of(2026, 10, 30), "2370")));
+        Post withQuote = post(10L, alice, "a", "b", List.of("2330", "0050"));
+        when(postDao.findPage(null, 0, 20)).thenReturn(new PageResult<>(List.of(withQuote), 1));
+
+        var stocks = service.listPosts(null, 0).items().get(0).stocks();
+
+        assertThat(stocks.get(0).close()).isEqualByComparingTo("2370");
+        assertThat(stocks.get(0).change()).isEqualByComparingTo("30");
+        assertThat(stocks.get(0).changePercent()).isEqualByComparingTo("1.28");
+        assertThat(stocks.get(0).priceDate()).isEqualTo(LocalDate.of(2026, 10, 30));
+        assertThat(stocks.get(1).name()).isEqualTo("股票0050");
+        assertThat(stocks.get(1).close()).isNull();
+        verify(dailyPriceDao).findByStocksSince(any(), eq(LocalDate.of(2026, 10, 19)));
+    }
+
+    private static DailyPrice price(Stock stock, LocalDate date, String close) {
+        BigDecimal c = new BigDecimal(close);
+        return new DailyPrice(stock, date, c, c, c, c, 1_000L);
     }
 
     private static Member member(long id, String name) {

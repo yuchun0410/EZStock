@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -34,6 +35,16 @@ public class DailyPriceMyBatisDao implements DailyPriceDao {
         log.debug("[MyBatis] 查詢日線 stockId={} 期間 {} ~ {}", stockId, from, to);
         List<DailyPrice> result = dailyPriceMapper.findByStockAndDateRange(stockId, from, to);
         log.debug("[MyBatis] 查詢日線 stockId={} 共 {} 筆", stockId, result.size());
+        return result;
+    }
+
+    @Override
+    public List<DailyPrice> findByStocksSince(Collection<String> stockIds, LocalDate from) {
+        if (stockIds.isEmpty()) {
+            return List.of();
+        }
+        List<DailyPrice> result = dailyPriceMapper.findByStocksSince(stockIds, from);
+        log.debug("[MyBatis] 一次查詢 {} 檔股票 {} 之後的日線，共 {} 筆", stockIds.size(), from, result.size());
         return result;
     }
 
