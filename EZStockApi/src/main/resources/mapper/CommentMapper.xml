@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ezstock.dao.mybatis.mapper.CommentMapper">
+
+    <resultMap id="commentMap" type="Comment">
+        <id     property="id"        column="id"/>
+        <result property="postId"    column="post_id"/>
+        <result property="content"   column="content"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="deletedAt" column="deleted_at"/>
+        <association property="author" javaType="Member">
+            <id     property="id"          column="author_id"/>
+            <result property="displayName" column="author_name"/>
+            <result property="avatarUrl"   column="author_avatar"/>
+        </association>
+    </resultMap>
+
+    <sql id="select">
+        SELECT c.id, c.post_id, c.content, c.created_at, c.deleted_at,
+               m.id AS author_id, m.display_name AS author_name, m.avatar_url AS author_avatar
+        FROM comment c
+        JOIN member m ON m.id = c.member_id
+    </sql>
+
+    <select id="findByPost" resultMap="commentMap">
+        <include refid="select"/>
+        WHERE c.post_id = #{postId}
+        ORDER BY c.id
+    </select>
+
+    <select id="findById" resultMap="commentMap">
+        <include refid="select"/>
+        WHERE c.id = #{id}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO comment (post_id, member_id, content, created_at, deleted_at)
+        VALUES (#{postId}, #{author.id}, #{content}, #{createdAt}, #{deletedAt})
+    </insert>
+
+    <update id="updateDeletedAt">
+        UPDATE comment SET deleted_at = #{deletedAt} WHERE id = #{id}
+    </update>
+</mapper>

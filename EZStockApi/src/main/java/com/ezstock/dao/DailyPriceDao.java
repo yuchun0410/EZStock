@@ -3,6 +3,7 @@ package com.ezstock.dao;
 import com.ezstock.model.DailyPrice;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,6 +17,9 @@ public interface DailyPriceDao {
 
     /** 某檔股票最新一筆日線 */
     Optional<DailyPrice> findLatest(String stockId);
+
+    /** 好幾檔股票從 from 之後的日線，一句 SQL 查完（例如論壇列表要顯示每個股票標籤的最新漲跌） */
+    List<DailyPrice> findByStocksSince(Collection<String> stockIds, LocalDate from);
 
     /** 資料庫裡有價格資料的股票代號（每日更新、條件選股的範圍） */
     List<String> findStockIdsWithPrices();

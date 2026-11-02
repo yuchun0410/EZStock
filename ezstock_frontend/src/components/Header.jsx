@@ -22,6 +22,9 @@ function Header() {
           <NavLink to="/screener" className="nav-link">
             條件選股
           </NavLink>
+          <NavLink to="/forum" className="nav-link">
+            論壇
+          </NavLink>
           <NavLink to="/assets" className="nav-link">
             我的資產
           </NavLink>

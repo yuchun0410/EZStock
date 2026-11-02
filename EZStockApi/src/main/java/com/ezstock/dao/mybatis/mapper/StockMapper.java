@@ -4,6 +4,7 @@ import com.ezstock.model.Stock;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.Collection;
 import java.util.List;
 
 @Mapper
@@ -14,6 +15,8 @@ public interface StockMapper {
     List<Stock> search(@Param("keyword") String keyword, @Param("limit") int limit);
 
     List<Stock> findAll();
+
+    List<Stock> findByIds(@Param("stockIds") Collection<String> stockIds);
 
     int upsert(Stock stock);
 }

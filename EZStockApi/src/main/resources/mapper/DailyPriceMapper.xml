@@ -29,6 +29,15 @@
         ORDER BY trade_date
     </select>
 
+    <select id="findByStocksSince" resultMap="dailyPriceMap">
+        SELECT <include refid="columns"/>
+        FROM daily_price
+        WHERE stock_id IN
+        <foreach collection="stockIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+          AND trade_date &gt;= #{from}
+        ORDER BY stock_id, trade_date
+    </select>
+
     <select id="findLatest" resultMap="dailyPriceMap">
         SELECT <include refid="columns"/>
         FROM daily_price

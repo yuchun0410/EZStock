@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,6 +33,16 @@ public class DailyPriceJpaDao implements DailyPriceDao {
         List<DailyPrice> result = dailyPriceRepository
                 .findByStock_StockIdAndTradeDateBetweenOrderByTradeDateAsc(stockId, from, to);
         log.debug("[JPA] 查詢日線 stockId={} 共 {} 筆", stockId, result.size());
+        return result;
+    }
+
+    @Override
+    public List<DailyPrice> findByStocksSince(Collection<String> stockIds, LocalDate from) {
+        if (stockIds.isEmpty()) {
+            return List.of();
+        }
+        List<DailyPrice> result = dailyPriceRepository.findByStocksSince(stockIds, from);
+        log.debug("[JPA] 一次查詢 {} 檔股票 {} 之後的日線，共 {} 筆", stockIds.size(), from, result.size());
         return result;
     }
 

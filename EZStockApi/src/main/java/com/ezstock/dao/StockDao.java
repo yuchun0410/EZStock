@@ -2,6 +2,7 @@ package com.ezstock.dao;
 
 import com.ezstock.model.Stock;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -17,6 +18,9 @@ public interface StockDao {
     List<Stock> search(String keyword, int limit);
 
     List<Stock> findAll();
+
+    /** 一次查好幾檔（例如論壇列表要顯示每篇文章標記的股票名稱），避免一檔一檔查 */
+    List<Stock> findByIds(Collection<String> stockIds);
 
     /** 不存在就新增，存在就更新名稱、類型、產業 */
     void save(Stock stock);

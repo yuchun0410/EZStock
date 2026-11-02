@@ -5,6 +5,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 
 @Mapper
@@ -21,6 +22,9 @@ public interface DailyPriceMapper {
     List<LocalDate> findTradeDates(@Param("stockId") String stockId,
                                    @Param("from") LocalDate from,
                                    @Param("to") LocalDate to);
+
+    List<DailyPrice> findByStocksSince(@Param("stockIds") Collection<String> stockIds,
+                                       @Param("from") LocalDate from);
 
     int insertBatch(@Param("prices") List<DailyPrice> prices);
 }

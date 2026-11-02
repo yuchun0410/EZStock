@@ -1,0 +1,57 @@
+    ### 論壇（發文、留言要先在 auth.http 執行「登入」）
+
+### 文章列表（不用登入）
+GET http://localhost:8080/api/posts
+
+### 只看標記 2330 的文章
+GET http://localhost:8080/api/posts?stockId=2330
+
+### 發文
+POST http://localhost:8080/api/posts
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "台積電法說會心得",
+  "content": "營收比預期好，毛利率維持高檔。\n\n大家怎麼看？",
+  "stockIds": ["2330"]
+}
+
+> {% if (response.status === 201) { client.global.set("postId", response.body.id); } %}
+
+### 文章內頁（不用登入；有登入會多回傳能不能修改）
+GET http://localhost:8080/api/posts/{{postId}}
+
+### 留言
+POST http://localhost:8080/api/posts/{{postId}}/comments
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "content": "同意，下季應該也不錯" }
+
+> {% if (response.status === 201) { client.global.set("commentId", response.body.comments[response.body.comments.length - 1].id); } %}
+
+### 刪除留言
+DELETE http://localhost:8080/api/comments/{{commentId}}
+Authorization: Bearer {{accessToken}}
+
+### 修改文章
+PUT http://localhost:8080/api/posts/{{postId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "台積電法說會心得（更新）",
+  "content": "補充：資本支出也上修了。",
+  "stockIds": ["2330", "0050"]
+}
+
+### 沒登入發文：應該回 401
+POST http://localhost:8080/api/posts
+Content-Type: application/json
+
+{ "title": "t", "content": "c" }
+
+### 刪除文章
+DELETE http://localhost:8080/api/posts/{{postId}}
+Authorization: Bearer {{accessToken}}

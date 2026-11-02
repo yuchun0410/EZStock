@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ezstock.dao.mybatis.mapper.PostMapper">
+
+    <!-- 作者只帶畫面需要的欄位，不查 Email、密碼雜湊 -->
+    <resultMap id="postMap" type="Post">
+        <id     property="id"           column="id"/>
+        <result property="title"        column="title"/>
+        <result property="content"      column="content"/>
+        <result property="commentCount" column="comment_count"/>
+        <result property="createdAt"    column="created_at"/>
+        <result property="updatedAt"    column="updated_at"/>
+        <result property="deletedAt"    column="deleted_at"/>
+        <association property="author" javaType="Member">
+            <id     property="id"          column="author_id"/>
+            <result property="displayName" column="author_name"/>
+            <result property="avatarUrl"   column="author_avatar"/>
+        </association>
+    </resultMap>
+
+    <sql id="select">
+        SELECT p.id, p.title, p.content, p.comment_count, p.created_at, p.updated_at, p.deleted_at,
+               m.id AS author_id, m.display_name AS author_name, m.avatar_url AS author_avatar
+        FROM post p
+        JOIN member m ON m.id = p.member_id
+    </sql>
+
+    <sql id="activeFilter">
+        WHERE p.deleted_at IS NULL
+        <if test="stockId != null">
+            AND EXISTS (SELECT 1 FROM post_stock ps WHERE ps.post_id = p.id AND ps.stock_id = #{stockId})
+        </if>
+    </sql>
+
+    <select id="findPage" resultMap="postMap">
+        <include refid="select"/>
+        <include refid="activeFilter"/>
+        ORDER BY p.created_at DESC, p.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*) FROM post p
+        <include refid="activeFilter"/>
+    </select>
+
+    <select id="findById" resultMap="postMap">
+        <include refid="select"/>
+        WHERE p.id = #{id}
+    </select>
+
+    <select id="findStockIds" resultType="map">
+        SELECT post_id, stock_id FROM post_stock
+        WHERE post_id IN
+        <foreach collection="postIds" item="postId" open="(" separator="," close=")">#{postId}</foreach>
+        ORDER BY post_id, stock_id
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO post (member_id, title, content, comment_count, created_at, updated_at, deleted_at)
+        VALUES (#{author.id}, #{title}, #{content}, #{commentCount}, #{createdAt}, #{updatedAt}, #{deletedAt})
+    </insert>
+
+    <!-- 留言數另外用 addCommentCount 原子更新，這裡不動，避免蓋掉別人剛加的 -->
+    <update id="update">
+        UPDATE post
+        SET title = #{title}, content = #{content}, updated_at = #{updatedAt}, deleted_at = #{deletedAt}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteStockIds">
+        DELETE FROM post_stock WHERE post_id = #{postId}
+    </delete>
+
+    <insert id="insertStockIds">
+        INSERT INTO post_stock (post_id, stock_id) VALUES
+        <foreach collection="stockIds" item="stockId" separator=",">(#{postId}, #{stockId})</foreach>
+    </insert>
+
+    <update id="addCommentCount">
+        UPDATE post SET comment_count = comment_count + #{delta} WHERE id = #{id}
+    </update>
+</mapper>
