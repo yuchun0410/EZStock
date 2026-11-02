@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,6 +40,16 @@ public class StockMyBatisDao implements StockDao {
         List<Stock> result = stockMapper.search(keyword, limit);
         log.debug("[MyBatis] 搜尋股票 keyword={} 共 {} 筆", keyword, result.size());
         return result;
+    }
+
+    @Override
+    public List<Stock> findByIds(Collection<String> stockIds) {
+        if (stockIds.isEmpty()) {
+            return List.of();
+        }
+        List<Stock> stocks = stockMapper.findByIds(stockIds);
+        log.debug("[MyBatis] 一次查詢 {} 檔股票，找到 {} 檔", stockIds.size(), stocks.size());
+        return stocks;
     }
 
     @Override

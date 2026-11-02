@@ -59,6 +59,12 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", e.getMessage());
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ApiError> handleForbidden(ForbiddenException e) {
+        log.warn("沒有權限：{}", e.getMessage());
+        return build(HttpStatus.FORBIDDEN, "FORBIDDEN", e.getMessage());
+    }
+
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ApiError> handleConflict(ConflictException e) {
         log.warn("資料衝突：{}", e.getMessage());

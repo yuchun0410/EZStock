@@ -27,6 +27,12 @@
         LIMIT #{limit}
     </select>
 
+    <select id="findByIds" resultMap="stockMap">
+        SELECT <include refid="columns"/> FROM stock
+        WHERE stock_id IN
+        <foreach collection="stockIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
     <select id="findAll" resultMap="stockMap">
         SELECT <include refid="columns"/>
         FROM stock

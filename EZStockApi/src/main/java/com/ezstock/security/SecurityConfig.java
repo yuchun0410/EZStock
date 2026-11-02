@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
@@ -23,7 +24,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * Spring Security 設定。
  * - 無狀態（STATELESS）：不用 session，每個請求自己帶 Authorization: Bearer <JWT>
- * - 查股價、回測、選股維持公開；會員資料、之後的自選股才需要登入
+ * - 查股價、回測、選股、看論壇維持公開；會員資料、自選股、資產、發文和留言要登入
  * - 沒帶 token 或 token 無效，回跟其他錯誤一樣格式的 JSON 401
  */
 @Configuration
@@ -42,6 +43,9 @@ public class SecurityConfig {
                 .httpBasic(basic -> basic.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/members/me", "/api/members/me/**").authenticated()
+                        // 論壇：看文章不用登入，發文、修改、刪除、留言要登入
+                        .requestMatchers(HttpMethod.GET, "/api/posts", "/api/posts/**").permitAll()
+                        .requestMatchers("/api/posts", "/api/posts/**", "/api/comments/**").authenticated()
                         .anyRequest().permitAll())
                 .oauth2ResourceServer(resource -> resource
                         .bearerTokenResolver(bearerTokenResolver())

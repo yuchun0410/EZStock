@@ -89,6 +89,10 @@ abstract class AbstractDaoTest {
                 .extracting(Stock::getStockId)
                 .contains(TEST_STOCK_ID);
 
+        assertThat(stockDao.findByIds(List.of(TEST_STOCK_ID, "NOPE99")))
+                .extracting(Stock::getStockId)
+                .containsExactly(TEST_STOCK_ID);
+
         stockDao.save(new Stock(TEST_STOCK_ID, "改名後", StockType.ETF, "測試產業"));
         Stock updated = stockDao.findById(TEST_STOCK_ID).orElseThrow();
         assertThat(updated.getName()).isEqualTo("改名後");

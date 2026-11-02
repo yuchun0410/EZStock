@@ -11,6 +11,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -42,6 +43,16 @@ public class StockJpaDao implements StockDao {
                 .findByStockIdContainingOrNameContainingOrderByStockIdAsc(keyword, keyword, Limit.of(limit));
         log.debug("[JPA] 搜尋股票 keyword={} 共 {} 筆", keyword, result.size());
         return result;
+    }
+
+    @Override
+    public List<Stock> findByIds(Collection<String> stockIds) {
+        if (stockIds.isEmpty()) {
+            return List.of();
+        }
+        List<Stock> stocks = stockRepository.findAllById(stockIds);
+        log.debug("[JPA] 一次查詢 {} 檔股票，找到 {} 檔", stockIds.size(), stocks.size());
+        return stocks;
     }
 
     @Override
