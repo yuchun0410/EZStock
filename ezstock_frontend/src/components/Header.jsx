@@ -1,4 +1,5 @@
 import { Link, NavLink } from 'react-router'
+import AccountMenu from './AccountMenu'
 
 function Header() {
   return (
@@ -22,6 +23,7 @@ function Header() {
             條件選股
           </NavLink>
         </nav>
+        <AccountMenu />
       </div>
     </header>
   )

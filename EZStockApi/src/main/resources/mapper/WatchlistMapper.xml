@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ezstock.dao.mybatis.mapper.WatchlistMapper">
+
+    <resultMap id="watchlistItemMap" type="WatchlistItem">
+        <result property="addedAt" column="added_at"/>
+        <association property="id" javaType="com.ezstock.model.WatchlistItem$Key">
+            <result property="memberId" column="member_id"/>
+            <result property="stockId"  column="stock_id"/>
+        </association>
+        <association property="stock" javaType="Stock">
+            <id     property="stockId"  column="stock_id"/>
+            <result property="name"     column="name"/>
+            <result property="type"     column="type"/>
+            <result property="industry" column="industry"/>
+        </association>
+    </resultMap>
+
+    <!-- 一次 JOIN 把股票名稱查出來 -->
+    <select id="findByMember" resultMap="watchlistItemMap">
+        SELECT w.member_id, w.stock_id, w.added_at, s.name, s.type, s.industry
+        FROM watchlist_item w
+        JOIN stock s ON s.stock_id = w.stock_id
+        WHERE w.member_id = #{memberId}
+        ORDER BY w.added_at
+    </select>
+
+    <insert id="insertIgnore">
+        INSERT IGNORE INTO watchlist_item (member_id, stock_id, added_at)
+        VALUES (#{item.id.memberId}, #{item.id.stockId}, #{item.addedAt})
+    </insert>
+
+    <delete id="delete">
+        DELETE FROM watchlist_item WHERE member_id = #{memberId} AND stock_id = #{stockId}
+    </delete>
+</mapper>

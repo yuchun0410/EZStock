@@ -1,0 +1,74 @@
+### 使用方式：由上往下依序執行。accessToken 是「登入」那一步存起來的變數，沒先登入，後面帶 token 的請求會跳出 unsubstituted variable
+
+### 註冊（成功會直接登入，回應 body 有 accessToken，refresh token 在 Set-Cookie）
+POST http://localhost:8080/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "demo@example.com",
+  "password": "demo-password-123",
+  "displayName": "示範帳號"
+}
+
+### 登入，把 accessToken 存起來給下面用
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "demo@example.com",
+  "password": "demo-password-123"
+}
+
+> {% if (response.status === 200) { client.global.set("accessToken", response.body.accessToken); } %}
+
+### 查自己的資料（要帶 access token）
+GET http://localhost:8080/api/members/me
+Authorization: Bearer {{accessToken}}
+
+### 沒帶 token：應該回 401
+GET http://localhost:8080/api/members/me
+
+### 密碼錯誤：應該回 401「Email 或密碼錯誤」
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "demo@example.com",
+  "password": "wrong-password"
+}
+
+### 換新 token（IntelliJ 會自動帶上前面拿到的 cookie）
+POST http://localhost:8080/api/auth/refresh
+
+> {% if (response.status === 200) { client.global.set("accessToken", response.body.accessToken); } %}
+
+### 登出：refresh token 作廢、access token 加入黑名單
+POST http://localhost:8080/api/auth/logout
+Authorization: Bearer {{accessToken}}
+
+### 登出後再用同一個 access token：應該回 401
+GET http://localhost:8080/api/members/me
+Authorization: Bearer {{accessToken}}
+
+### ---------- 自選股（要先執行上面的「登入」） ----------
+
+### 我的自選股
+GET http://localhost:8080/api/members/me/watchlist
+Authorization: Bearer {{accessToken}}
+
+### 加入 2330（重複加入不會出錯）
+PUT http://localhost:8080/api/members/me/watchlist/2330
+Authorization: Bearer {{accessToken}}
+
+### 移除 2330
+DELETE http://localhost:8080/api/members/me/watchlist/2330
+Authorization: Bearer {{accessToken}}
+
+### 匯入瀏覽器裡的自選股（已存在、查無的會略過）
+POST http://localhost:8080/api/members/me/watchlist/import
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "stockIds": ["0050", "2330", "9999"]
+}

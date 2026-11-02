@@ -36,6 +36,16 @@ jobs:
           --health-interval=5s
           --health-timeout=5s
           --health-retries=20
+      # 會員登入的 refresh token、黑名單存在 Redis
+      redis:
+        image: redis:8
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
 
     steps:
       - name: 取得程式碼
