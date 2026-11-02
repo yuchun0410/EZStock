@@ -1,0 +1,34 @@
+### 資產儀表板（要先在 auth.http 執行「登入」，accessToken 變數兩個檔案共用）
+
+### 我的資產儀表板
+GET http://localhost:8080/api/members/me/assets
+Authorization: Bearer {{accessToken}}
+
+### 新增現金帳戶
+POST http://localhost:8080/api/members/me/assets/accounts
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "kind": "CASH", "name": "活存", "balance": 300000 }
+
+### 新增負債
+POST http://localhost:8080/api/members/me/assets/accounts
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "kind": "LIABILITY", "name": "信貸", "balance": 150000 }
+
+### 新增或修改持股（同一檔再送一次就是修改）
+PUT http://localhost:8080/api/members/me/assets/holdings/2330
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "shares": 1000, "averageCost": 950.5 }
+
+### 刪除持股
+DELETE http://localhost:8080/api/members/me/assets/holdings/2330
+Authorization: Bearer {{accessToken}}
+
+### 刪除帳戶（id 換成上面回傳的帳戶 id；別人的帳戶 id 會回 404）
+DELETE http://localhost:8080/api/members/me/assets/accounts/1
+Authorization: Bearer {{accessToken}}
