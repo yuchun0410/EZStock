@@ -38,6 +38,7 @@ class LineCommandHandlerTest {
     private LineBindingService bindingService;
     private MemberDao memberDao;
     private AssetService assetService;
+    private PriceAlertService alertService;
     private LineCommandHandler handler;
 
     @BeforeEach
@@ -48,8 +49,9 @@ class LineCommandHandlerTest {
         bindingService = mock(LineBindingService.class);
         memberDao = mock(MemberDao.class);
         assetService = mock(AssetService.class);
+        alertService = mock(PriceAlertService.class);
         handler = new LineCommandHandler(stockDao, dailyPriceDao, bindingService, memberDao, assetService,
-                new LineMessageFormatter(), mock(LineDailyReportService.class), clock);
+                new LineMessageFormatter(), mock(LineDailyReportService.class), alertService, clock);
         when(memberDao.findByLineUserId(anyString())).thenReturn(Optional.empty());
 
         when(stockDao.findById(anyString())).thenReturn(Optional.empty());
@@ -115,6 +117,23 @@ class LineCommandHandlerTest {
         assertThat(handler.handle("U2", "資產").get(0))
                 .startsWith("小明 的資產（11/2）\n淨資產 2,380,000 元")
                 .contains("・股票 2,370,000（未實現 +1,420,000，+149.47%）");
+    }
+
+    @Test
+    @DisplayName("到價提醒：「提醒 2330 < 2,200」設定跌破提醒，並告訴使用者目前收盤")
+    void createAlert() {
+        Member member = Member.withPassword("a@example.com", "hash", "小明", LocalDateTime.now());
+        org.springframework.test.util.ReflectionTestUtils.setField(member, "id", 7L);
+        when(memberDao.findByLineUserId("U2")).thenReturn(Optional.of(member));
+        com.ezstock.model.PriceAlert alert = new com.ezstock.model.PriceAlert(7L, tsmc,
+                com.ezstock.model.AlertDirection.BELOW, new BigDecimal("2200"), LocalDateTime.now());
+        when(alertService.create(7L, tsmc, com.ezstock.model.AlertDirection.BELOW, new BigDecimal("2200")))
+                .thenReturn(new PriceAlertService.Created(alert, new BigDecimal("2370"), false));
+
+        assertThat(handler.handle("U2", "提醒 2330 < 2,200").get(0))
+                .startsWith("已設定提醒：2330 台積電 跌破 2,200.00")
+                .contains("目前收盤 2,370.00");
+        assertThat(handler.handle("U1", "提醒 2330 > 2500")).containsExactly(LineCommandHandler.NOT_LINKED);
     }
 
     private DailyPrice price(LocalDate date, String close) {

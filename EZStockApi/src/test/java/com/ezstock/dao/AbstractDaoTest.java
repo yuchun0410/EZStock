@@ -3,10 +3,12 @@ package com.ezstock.dao;
 import com.ezstock.model.DailyPrice;
 import com.ezstock.model.Dividend;
 import com.ezstock.model.AccountKind;
+import com.ezstock.model.AlertDirection;
 import com.ezstock.model.Comment;
 import com.ezstock.model.Member;
 import com.ezstock.model.MoneyAccount;
 import com.ezstock.model.Post;
+import com.ezstock.model.PriceAlert;
 import com.ezstock.model.Stock;
 import com.ezstock.model.SplitType;
 import com.ezstock.model.StockSplit;
@@ -69,6 +71,9 @@ abstract class AbstractDaoTest {
 
     @Autowired
     protected CommentDao commentDao;
+
+    @Autowired
+    protected PriceAlertDao priceAlertDao;
 
     private Stock stock;
 
@@ -364,6 +369,32 @@ abstract class AbstractDaoTest {
         edited.edit("新標題", "新內容", List.of(), t.plusHours(1));
         postDao.save(edited);
         assertThat(postDao.findById(post.getId()).orElseThrow().getCommentCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("到價提醒：查得到股票名稱，通知過的不再出現，只能刪自己的")
+    void priceAlert() {
+        LocalDateTime t = LocalDateTime.of(2026, 11, 3, 14, 0);
+        Member me = memberDao.save(Member.withPassword("alert@example.com", "hash", "我", t));
+        Member other = memberDao.save(Member.withPassword("alert-other@example.com", "hash", "別人", t));
+
+        PriceAlert below = priceAlertDao.save(new PriceAlert(me.getId(), stock, AlertDirection.BELOW, new BigDecimal("90"), t));
+        PriceAlert above = priceAlertDao.save(new PriceAlert(me.getId(), stock, AlertDirection.ABOVE, new BigDecimal("120.5"), t));
+
+        List<PriceAlert> active = priceAlertDao.findActiveByMember(me.getId());
+        assertThat(active).extracting(PriceAlert::getId).containsExactly(below.getId(), above.getId());
+        assertThat(active.get(0).getStock().getName()).isEqualTo("測試股票");
+        assertThat(active.get(1).getTargetPrice()).isEqualByComparingTo("120.5");
+
+        PriceAlert triggered = active.get(0);
+        triggered.markTriggered(t.plusHours(4));
+        priceAlertDao.save(triggered);
+        assertThat(priceAlertDao.findActiveByMember(me.getId())).extracting(PriceAlert::getId)
+                .containsExactly(above.getId());
+
+        assertThat(priceAlertDao.deleteByIdAndMember(above.getId(), other.getId())).isFalse();
+        assertThat(priceAlertDao.deleteByIdAndMember(above.getId(), me.getId())).isTrue();
+        assertThat(priceAlertDao.findActiveByMember(me.getId())).isEmpty();
     }
 
     private DailyPrice price(LocalDate date, String open, String close) {

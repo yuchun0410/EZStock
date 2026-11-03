@@ -41,6 +41,7 @@ class LineDailyReportServiceTest {
     private AssetService assetService;
     private WatchlistService watchlistService;
     private ScreenerService screenerService;
+    private PriceAlertService alertService;
     private LineDailyReportService service;
     private Member member;
 
@@ -49,9 +50,10 @@ class LineDailyReportServiceTest {
         assetService = mock(AssetService.class);
         watchlistService = mock(WatchlistService.class);
         screenerService = mock(ScreenerService.class);
+        alertService = mock(PriceAlertService.class);
         Clock clock = Clock.fixed(Instant.parse("2026-11-03T10:00:00Z"), ZoneId.of("Asia/Taipei"));
         service = new LineDailyReportService(assetService, watchlistService, screenerService,
-                new LineMessageFormatter(), clock);
+                new LineMessageFormatter(), alertService, clock);
         member = Member.withPassword("a@example.com", "hash", "小明", LocalDateTime.now());
         ReflectionTestUtils.setField(member, "id", 7L);
         when(assetService.summary(7L)).thenReturn(SUMMARY);
@@ -76,6 +78,19 @@ class LineDailyReportServiceTest {
         ArgumentCaptor<ScreenRequest> request = ArgumentCaptor.forClass(ScreenRequest.class);
         verify(screenerService).screen(request.capture());
         assertThat(request.getValue().stockIds()).containsExactly("2330", "0050");
+    }
+
+    @Test
+    @DisplayName("有到價的提醒：放在最前面")
+    void triggeredAlertsFirst() {
+        when(watchlistService.list(7L)).thenReturn(List.of());
+        when(alertService.checkTriggered(7L)).thenReturn(List.of("2330 台積電 跌破 2,200.00｜收盤 2,180.00"));
+
+        List<String> messages = service.build(member);
+
+        assertThat(messages).hasSize(2);
+        assertThat(messages.get(0)).isEqualTo("【到價提醒】\n2330 台積電 跌破 2,200.00｜收盤 2,180.00");
+        assertThat(messages.get(1)).startsWith("小明 的資產");
     }
 
     @Test

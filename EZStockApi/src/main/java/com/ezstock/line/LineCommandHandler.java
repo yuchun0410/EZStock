@@ -3,8 +3,11 @@ package com.ezstock.line;
 import com.ezstock.dao.DailyPriceDao;
 import com.ezstock.dao.MemberDao;
 import com.ezstock.dao.StockDao;
+import com.ezstock.exception.BadRequestException;
+import com.ezstock.model.AlertDirection;
 import com.ezstock.model.DailyPrice;
 import com.ezstock.model.Member;
+import com.ezstock.model.PriceAlert;
 import com.ezstock.model.Stock;
 import com.ezstock.service.AssetService;
 import org.slf4j.Logger;
@@ -35,6 +38,9 @@ public class LineCommandHandler {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("M/d");
     /** 「綁定 123456」「綁定123456」都可以 */
     private static final Pattern BIND = Pattern.compile("^綁定\\s*(\\d{6})$");
+    /** 「提醒 2330 < 2200」「提醒台積電>2500」「提醒 2330 < 2,200.5」 */
+    private static final Pattern ALERT = Pattern.compile("^提醒\\s*(\\S+?)\\s*([<>])\\s*([\\d,]+(?:\\.\\d+)?)$");
+    private static final Pattern DELETE_ALERT = Pattern.compile("^刪除提醒\\s*(\\d+)$");
 
     static final String HELP = """
             EZStock 小幫手可以做這些事：
@@ -42,6 +48,8 @@ public class LineCommandHandler {
             ・傳「資產」查淨資產（要先綁定帳號）
             ・傳「回報」看今天的每日回報（淨資產＋自選股站上月線）
             ・傳「綁定 123456」綁定網站帳號（綁定碼在網站「我的資產」頁產生）
+            ・傳「提醒 2330 < 2200」收盤跌破時通知；「提醒 2330 > 2500」突破時通知
+            ・傳「提醒」看所有提醒；「刪除提醒 1」刪掉第 1 個
             ・傳「解除綁定」取消綁定
             ・傳「說明」看這段說明""";
 
@@ -54,11 +62,12 @@ public class LineCommandHandler {
     private final AssetService assetService;
     private final LineMessageFormatter formatter;
     private final LineDailyReportService reportService;
+    private final PriceAlertService alertService;
     private final Clock clock;
 
     public LineCommandHandler(StockDao stockDao, DailyPriceDao dailyPriceDao, LineBindingService bindingService,
                               MemberDao memberDao, AssetService assetService, LineMessageFormatter formatter,
-                              LineDailyReportService reportService, Clock clock) {
+                              LineDailyReportService reportService, PriceAlertService alertService, Clock clock) {
         this.stockDao = stockDao;
         this.dailyPriceDao = dailyPriceDao;
         this.bindingService = bindingService;
@@ -66,6 +75,7 @@ public class LineCommandHandler {
         this.assetService = assetService;
         this.formatter = formatter;
         this.reportService = reportService;
+        this.alertService = alertService;
         this.clock = clock;
     }
 
@@ -94,6 +104,17 @@ public class LineCommandHandler {
             log.info("[LINE] 會員 id={} 手動查詢每日回報", member.get().getId());
             return reportService.build(member.get());
         }
+        Matcher alert = ALERT.matcher(input);
+        if (alert.matches()) {
+            return List.of(createAlert(userId, alert.group(1), alert.group(2), alert.group(3)));
+        }
+        if (input.equals("提醒") || input.equals("提醒清單")) {
+            return List.of(listAlerts(userId));
+        }
+        Matcher deleteAlert = DELETE_ALERT.matcher(input);
+        if (deleteAlert.matches()) {
+            return List.of(deleteAlert(userId, Integer.parseInt(deleteAlert.group(1))));
+        }
         if (input.equals("解除綁定")) {
             return List.of(bindingService.unlinkByLineUser(userId)
                     .map(m -> "已解除綁定，之後不會再收到每日回報。")
@@ -119,6 +140,58 @@ public class LineCommandHandler {
             case LineBindingService.BindResult.TooManyFailures ignored ->
                     "錯誤太多次，請 10 分鐘後再試。";
         };
+    }
+
+    private String createAlert(String userId, String stockInput, String symbol, String price) {
+        Optional<Member> member = memberDao.findByLineUserId(userId);
+        if (member.isEmpty()) {
+            return NOT_LINKED;
+        }
+        Optional<Stock> stock = findStock(stockInput);
+        if (stock.isEmpty()) {
+            return "找不到「" + abbreviate(stockInput) + "」這檔股票。";
+        }
+        try {
+            PriceAlertService.Created created = alertService.create(member.get().getId(), stock.get(),
+                    AlertDirection.fromSymbol(symbol), new BigDecimal(price.replace(",", "")));
+            StringBuilder text = new StringBuilder("已設定提醒：").append(PriceAlertService.describe(created.alert()))
+                    .append("\n每天收盤後檢查，到價會通知你一次。");
+            if (created.latestClose() != null) {
+                text.append("\n目前收盤 ").append(price(created.latestClose()));
+                if (created.alreadyReached()) {
+                    text.append("，已經達到目標，今天的回報就會通知。");
+                }
+            }
+            return text.toString();
+        } catch (BadRequestException e) {
+            return e.getMessage();
+        }
+    }
+
+    private String listAlerts(String userId) {
+        Optional<Member> member = memberDao.findByLineUserId(userId);
+        if (member.isEmpty()) {
+            return NOT_LINKED;
+        }
+        List<PriceAlert> alerts = alertService.list(member.get().getId());
+        if (alerts.isEmpty()) {
+            return "目前沒有到價提醒。\n傳「提醒 2330 < 2200」可以新增。";
+        }
+        StringBuilder text = new StringBuilder("你的到價提醒：");
+        for (int i = 0; i < alerts.size(); i++) {
+            text.append('\n').append(i + 1).append(". ").append(PriceAlertService.describe(alerts.get(i)));
+        }
+        return text.append("\n\n傳「刪除提醒 1」可以刪掉第 1 個。").toString();
+    }
+
+    private String deleteAlert(String userId, int number) {
+        Optional<Member> member = memberDao.findByLineUserId(userId);
+        if (member.isEmpty()) {
+            return NOT_LINKED;
+        }
+        return alertService.deleteByNumber(member.get().getId(), number)
+                .map(alert -> "已刪除提醒：" + PriceAlertService.describe(alert))
+                .orElse("沒有第 " + number + " 個提醒，傳「提醒」看清單。");
     }
 
     private String assets(String userId) {

@@ -24,6 +24,7 @@ import java.util.List;
  * 每日回報的內容：
  * 1. 淨資產明細（跟 LINE 傳「資產」一樣）
  * 2. 自選股裡今天「收盤站上月線」的股票（用條件選股的程式）
+ * 3. 有到價的提醒，放在最前面
  * 排程推播與 LINE 傳「回報」共用這裡，傳「回報」用 reply 不花推播額度，方便測試。
  */
 @Service
@@ -37,20 +38,27 @@ public class LineDailyReportService {
     private final WatchlistService watchlistService;
     private final ScreenerService screenerService;
     private final LineMessageFormatter formatter;
+    private final PriceAlertService alertService;
     private final Clock clock;
 
     public LineDailyReportService(AssetService assetService, WatchlistService watchlistService,
-                                  ScreenerService screenerService, LineMessageFormatter formatter, Clock clock) {
+                                  ScreenerService screenerService, LineMessageFormatter formatter,
+                                  PriceAlertService alertService, Clock clock) {
         this.assetService = assetService;
         this.watchlistService = watchlistService;
         this.screenerService = screenerService;
         this.formatter = formatter;
+        this.alertService = alertService;
         this.clock = clock;
     }
 
-    /** 一則推播最多 5 個訊息框，這裡最多 2 個；一個人一次推播只算一則額度 */
+    /** 一則推播最多 5 個訊息框，這裡最多 3 個；一個人一次推播只算一則額度 */
     public List<String> build(Member member) {
         List<String> messages = new ArrayList<>();
+        List<String> triggered = alertService.checkTriggered(member.getId());
+        if (!triggered.isEmpty()) {
+            messages.add("【到價提醒】\n" + String.join("\n", triggered));
+        }
         messages.add(formatter.assetReport(member.getDisplayName(), LocalDate.now(clock),
                 assetService.summary(member.getId())));
 
