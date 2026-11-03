@@ -30,6 +30,12 @@ ezstock.jwt.cookie-secure=false
 # 空白代表不開放 Google 登入（登入頁不會顯示 Google 按鈕）
 ezstock.google.client-id=
 
+# ---------- LINE Bot ----------
+# 兩個都是密碼，不要寫在這裡！請在 IntelliJ 的 Run Configuration → Environment variables 設定：
+#   EZSTOCK_LINE_CHANNEL_SECRET=<LINE Developers → Basic settings → Channel secret>
+#   EZSTOCK_LINE_CHANNEL_TOKEN=<LINE Developers → Messaging API → Channel access token>
+# 沒設定的話 LINE Bot 不會運作，其他功能不受影響
+
 finmind.api.url=https://api.finmindtrade.com/api/v4/data
 finmind.api.token=YOUR_FINMIND_TOKEN
 
