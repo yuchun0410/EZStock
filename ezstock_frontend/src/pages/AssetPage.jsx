@@ -11,6 +11,7 @@ import {
 import AccountList from '../components/AccountList'
 import AllocationBar from '../components/AllocationBar'
 import HoldingTable from '../components/HoldingTable'
+import LineCard from '../components/LineCard'
 import { useAuth } from '../hooks/useAuth'
 import { formatMoney, formatSigned, formatSignedMoney, trendClass } from '../utils/format'
 
@@ -166,6 +167,7 @@ function AssetPage() {
           ))}
         </div>
       </section>
+      <LineCard />
     </>
   )
 }
