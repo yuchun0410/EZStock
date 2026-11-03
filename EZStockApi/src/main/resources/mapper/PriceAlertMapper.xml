@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ezstock.dao.mybatis.mapper.PriceAlertMapper">
+
+    <resultMap id="priceAlertMap" type="PriceAlert">
+        <id     property="id"          column="id"/>
+        <result property="memberId"    column="member_id"/>
+        <result property="direction"   column="direction"/>
+        <result property="targetPrice" column="target_price"/>
+        <result property="createdAt"   column="created_at"/>
+        <result property="triggeredAt" column="triggered_at"/>
+        <association property="stock" javaType="Stock">
+            <id     property="stockId"  column="stock_id"/>
+            <result property="name"     column="name"/>
+            <result property="type"     column="type"/>
+            <result property="industry" column="industry"/>
+        </association>
+    </resultMap>
+
+    <select id="findActiveByMember" resultMap="priceAlertMap">
+        SELECT a.id, a.member_id, a.stock_id, a.direction, a.target_price, a.created_at, a.triggered_at,
+               s.name, s.type, s.industry
+        FROM price_alert a
+        JOIN stock s ON s.stock_id = a.stock_id
+        WHERE a.member_id = #{memberId} AND a.triggered_at IS NULL
+        ORDER BY a.id
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO price_alert (member_id, stock_id, direction, target_price, created_at, triggered_at)
+        VALUES (#{memberId}, #{stock.stockId}, #{direction}, #{targetPrice}, #{createdAt}, #{triggeredAt})
+    </insert>
+
+    <update id="updateTriggeredAt">
+        UPDATE price_alert SET triggered_at = #{triggeredAt} WHERE id = #{id}
+    </update>
+
+    <delete id="deleteByIdAndMember">
+        DELETE FROM price_alert WHERE id = #{id} AND member_id = #{memberId}
+    </delete>
+</mapper>

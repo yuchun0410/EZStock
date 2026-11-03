@@ -27,6 +27,10 @@ public class Member {
     @Column(name = "google_sub", unique = true)
     private String googleSub;
 
+    /** 綁定的 LINE 使用者 id；沒綁定時是 null */
+    @Column(name = "line_user_id", unique = true, length = 64)
+    private String lineUserId;
+
     @Column(name = "display_name", nullable = false, length = 50)
     private String displayName;
 
@@ -76,6 +80,14 @@ public class Member {
         }
     }
 
+    public void linkLine(String lineUserId) {
+        this.lineUserId = lineUserId;
+    }
+
+    public void unlinkLine() {
+        this.lineUserId = null;
+    }
+
     public void recordLogin(LocalDateTime time) {
         this.lastLoginAt = time;
     }
@@ -88,6 +100,7 @@ public class Member {
     public String getEmail() { return email; }
     public String getPasswordHash() { return passwordHash; }
     public String getGoogleSub() { return googleSub; }
+    public String getLineUserId() { return lineUserId; }
     public String getDisplayName() { return displayName; }
     public String getAvatarUrl() { return avatarUrl; }
     public LocalDateTime getCreatedAt() { return createdAt; }
