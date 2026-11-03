@@ -1,6 +1,7 @@
 package com.ezstock.datasource.finmind;
 
 import com.ezstock.datasource.CashDividend;
+import com.ezstock.datasource.NewsItem;
 import com.ezstock.datasource.PriceBar;
 import com.ezstock.datasource.ShareSplit;
 import com.ezstock.datasource.StockInfo;
@@ -14,6 +15,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -206,5 +208,36 @@ class FinMindDataSourceTest {
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31)))
                 .isInstanceOf(FinMindApiException.class)
                 .hasMessageContaining("402");
+    }
+
+    @Test
+    @DisplayName("新聞：只帶 start_date；略過沒標題、連結不是 http(s) 的資料")
+    void fetchNews() {
+        setUp(null);
+        server.expect(queryParam("dataset", "TaiwanStockNews"))
+                .andExpect(queryParam("data_id", "2330"))
+                .andExpect(queryParam("start_date", "2026-11-03"))
+                .andRespond(withSuccess("""
+                        {"msg":"success","status":200,"data":[
+                          {"date":"2026-11-03 14:05:12","stock_id":"2330","description":"...","link":" https://news.test/1 ",
+                           "source":"測試新聞","title":" 台積電法說會 "},
+                          {"date":"2026-11-03 15:00:00","stock_id":"2330","link":"javascript:alert(1)","source":"x","title":"壞連結"},
+                          {"date":"2026-11-03 16:00:00","stock_id":"2330","link":"https://news.test/2","source":"x","title":""}
+                        ]}""", MediaType.APPLICATION_JSON));
+
+        List<NewsItem> news = dataSource.fetchNews("2330", LocalDate.of(2026, 11, 3));
+
+        server.verify();
+        assertThat(news).containsExactly(new NewsItem("2330", LocalDateTime.of(2026, 11, 3, 14, 5, 12),
+                "台積電法說會", "測試新聞", "https://news.test/1"));
+    }
+
+    @Test
+    @DisplayName("新聞時間：有時分秒、只有日期、格式不對")
+    void parseNewsTime() {
+        assertThat(FinMindDataSource.parseNewsTime("2026-11-03 14:05:12")).isEqualTo(LocalDateTime.of(2026, 11, 3, 14, 5, 12));
+        assertThat(FinMindDataSource.parseNewsTime("2026-11-03")).isEqualTo(LocalDateTime.of(2026, 11, 3, 0, 0));
+        assertThat(FinMindDataSource.parseNewsTime("昨天")).isNull();
+        assertThat(FinMindDataSource.parseNewsTime(null)).isNull();
     }
 }

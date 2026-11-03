@@ -1,4 +1,5 @@
 import {
+  Area,
   Bar,
   CartesianGrid,
   ComposedChart,
@@ -18,6 +19,8 @@ import PriceTooltip from './PriceTooltip'
  */
 function PriceChart({ points, mode, trend, longRange, weekly, maPeriods }) {
   const lineColor = CHART_COLORS[trend] ?? CHART_COLORS.neutral
+  // 每種顏色一個漸層 id；同一頁只有一張價格圖，不會撞名
+  const gradientId = `price-fill-${trend || 'flat'}`
 
   return (
     <div className="chart" role="img" aria-label={mode === 'candle' ? 'K 線圖' : '收盤價走勢圖'}>
@@ -28,6 +31,13 @@ function PriceChart({ points, mode, trend, longRange, weekly, maPeriods }) {
           barCategoryGap="20%"
           margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
         >
+          {/* 折線下方的漸層：上面帶一點漲跌的顏色，往下淡到透明 */}
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={lineColor} stopOpacity={0.22} />
+              <stop offset="100%" stopColor={lineColor} stopOpacity={0} />
+            </linearGradient>
+          </defs>
           <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
           <XAxis
             dataKey="date"
@@ -53,11 +63,12 @@ function PriceChart({ points, mode, trend, longRange, weekly, maPeriods }) {
           {mode === 'candle' ? (
             <Bar dataKey="range" shape={<Candle />} isAnimationActive={false} />
           ) : (
-            <Line
+            <Area
               type="monotone"
               dataKey="close"
               stroke={lineColor}
               strokeWidth={2}
+              fill={`url(#${gradientId})`}
               dot={false}
               activeDot={{ r: 5, stroke: CHART_COLORS.surface, strokeWidth: 2 }}
               isAnimationActive={false}

@@ -59,6 +59,16 @@ final class FinMindDto {
             @JsonProperty("after_price") BigDecimal afterPrice) {
     }
 
+    /** TaiwanStockNews（相關新聞，一次只能查一天） */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record NewsRow(
+            @JsonProperty("date") String date,
+            @JsonProperty("stock_id") String stockId,
+            @JsonProperty("title") String title,
+            @JsonProperty("source") String source,
+            @JsonProperty("link") String link) {
+    }
+
     /** TaiwanStockParValueChange（變更面額恢復買賣參考價格） */
     @JsonIgnoreProperties(ignoreUnknown = true)
     record ParValueChangeRow(

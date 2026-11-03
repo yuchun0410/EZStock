@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { getStock } from '../api/stockApi'
 import DividendSection from '../components/DividendSection'
+import NewsList from '../components/NewsList'
 import PriceSection from '../components/PriceSection'
+import StockKeyStats from '../components/StockKeyStats'
 import StockDiscussion from '../components/StockDiscussion'
 import WatchButton from '../components/WatchButton'
 import { formatPrice, formatSigned, trendClass } from '../utils/format'
@@ -47,7 +49,7 @@ function StockPage() {
   const { detail } = result
   return (
     <>
-      <section className="card">
+      <section className="card card-hero">
         <div className="stock-heading">
           <h2 className="stock-title">
             {detail.stockId} {detail.name}
@@ -62,21 +64,30 @@ function StockPage() {
         {detail.latestClose == null ? (
           <p className="muted">尚無價格資料</p>
         ) : (
-          <>
-            <div className="stock-price">
-              <span className="stock-close">{formatPrice(detail.latestClose)}</span>
-              <span className={`stock-change ${trendClass(detail.change)}`}>
-                {formatSigned(detail.change)}（{formatSigned(detail.changePercent)}%）
-              </span>
+          <div className="stock-overview">
+            <div>
+              <div className="stock-price">
+                <span className="stock-close">{formatPrice(detail.latestClose)}</span>
+                <span className={`stock-change ${trendClass(detail.change)}`}>
+                  {formatSigned(detail.change)}（{formatSigned(detail.changePercent)}%）
+                </span>
+              </div>
+              <p className="stock-date muted">{detail.latestDate} 收盤</p>
             </div>
-            <p className="muted">{detail.latestDate} 收盤</p>
-          </>
+            <StockKeyStats
+              stockId={detail.stockId}
+              latestDate={detail.latestDate}
+              latestClose={detail.latestClose}
+              change={detail.change}
+            />
+          </div>
         )}
       </section>
       {detail.latestDate && <PriceSection stockId={detail.stockId} latestDate={detail.latestDate} />}
       {detail.latestDate && (
         <DividendSection stockId={detail.stockId} latestDate={detail.latestDate} latestClose={detail.latestClose} />
       )}
+      <NewsList stockIds={[detail.stockId]} limit={10} title="相關新聞" showStocks={false} />
       <StockDiscussion stockId={detail.stockId} name={detail.name} />
     </>
   )

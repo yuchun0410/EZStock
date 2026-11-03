@@ -2,6 +2,7 @@ package com.ezstock.datasource.finmind;
 
 import com.ezstock.datasource.CashDividend;
 import com.ezstock.datasource.MarketDataSource;
+import com.ezstock.datasource.NewsItem;
 import com.ezstock.datasource.PriceBar;
 import com.ezstock.datasource.ShareSplit;
 import com.ezstock.datasource.StockInfo;
@@ -17,6 +18,9 @@ import org.springframework.web.client.RestClientResponseException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -164,6 +168,61 @@ public class FinMindDataSource implements MarketDataSource {
                     splits.stream().map(s -> s.date() + " " + s.type()).toList());
         }
         return splits;
+    }
+
+    /**
+     * 相關新聞。FinMind 這個 dataset 資料量大，一次只給一天，所以只帶 start_date。
+     * 標題或連結是空的、連結不是 http(s) 開頭的都略過：連結會直接放進網頁的 href，
+     * 不檢查的話 "javascript:..." 這種連結點下去就會執行程式碼（XSS）。
+     */
+    @Override
+    public List<NewsItem> fetchNews(String stockId, LocalDate date) {
+        List<FinMindDto.NewsRow> rows = call("TaiwanStockNews", stockId, date, null,
+                new ParameterizedTypeReference<FinMindDto.Response<FinMindDto.NewsRow>>() {
+                });
+
+        List<NewsItem> news = new ArrayList<>();
+        int skipped = 0;
+        for (FinMindDto.NewsRow row : rows) {
+            LocalDateTime publishedAt = parseNewsTime(row.date());
+            if (row.title() == null || row.title().isBlank() || !isWebLink(row.link()) || publishedAt == null) {
+                skipped++;
+                continue;
+            }
+            news.add(new NewsItem(stockId, publishedAt, row.title().strip(),
+                    row.source() == null ? "" : row.source().strip(), row.link().strip()));
+        }
+        if (skipped > 0) {
+            log.info("[FinMind] {} {} 新聞略過 {} 筆資料不完整或連結不安全", stockId, date, skipped);
+        }
+        return news;
+    }
+
+    private static final DateTimeFormatter NEWS_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    /** FinMind 的新聞時間是 "2026-11-03 14:05:12"，偶爾只有日期；都解析不了回 null */
+    static LocalDateTime parseNewsTime(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String text = value.strip();
+        try {
+            return LocalDateTime.parse(text, NEWS_TIME);
+        } catch (DateTimeParseException e) {
+            try {
+                return LocalDate.parse(text.length() >= 10 ? text.substring(0, 10) : text).atStartOfDay();
+            } catch (DateTimeParseException ignored) {
+                return null;
+            }
+        }
+    }
+
+    static boolean isWebLink(String link) {
+        if (link == null) {
+            return false;
+        }
+        String lower = link.strip().toLowerCase();
+        return lower.startsWith("https://") || lower.startsWith("http://");
     }
 
     private void addIfValid(List<ShareSplit> splits, String stockId, String date, SplitType type,

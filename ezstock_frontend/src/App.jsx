@@ -16,9 +16,9 @@ import './App.css'
 
 function App() {
   return (
-    <>
+    <div className="app-shell">
       <Header />
-      <main className="container">
+      <main className="main">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/stocks/:stockId" element={<StockPage />} />
@@ -35,7 +35,7 @@ function App() {
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
-    </>
+    </div>
   )
 }
 
