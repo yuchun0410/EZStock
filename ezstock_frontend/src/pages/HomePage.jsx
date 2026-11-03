@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import NewsList from '../components/NewsList'
 import WatchlistCard from '../components/WatchlistCard'
 import { useStockSearch } from '../hooks/useStockSearch'
+import { useWatchlist } from '../hooks/useWatchlist'
 
 const POPULAR_STOCKS = [
   { stockId: '2330', name: '台積電' },
@@ -16,6 +18,9 @@ const POPULAR_STOCKS = [
 
 const TYPE_LABELS = { STOCK: '股票', ETF: 'ETF' }
 
+// 後端一次最多查 20 檔新聞：自選股優先，剩下的名額給熱門股
+const MAX_NEWS_STOCKS = 20
+
 /** 首頁：輸入代號或名稱搜尋股票 */
 function HomePage() {
   const navigate = useNavigate()
@@ -26,6 +31,12 @@ function HomePage() {
   const [query, setQuery] = useState('')
   const keyword = query.trim()
   const { stocks, error, loading, isCurrent } = useStockSearch(keyword)
+  const watchlist = useWatchlist()
+  // 等登入狀態和自選股都確定了才抓新聞，避免先用熱門股抓一次、自選股載入後又抓一次
+  const newsReady = !watchlist.authChecking && !watchlist.loading
+  const newsStockIds = [
+    ...new Set([...watchlist.items.map((item) => item.stockId), ...POPULAR_STOCKS.map((stock) => stock.stockId)]),
+  ].slice(0, MAX_NEWS_STOCKS)
 
   // 按 Enter：代號完全相符或只有一筆結果，就直接進個股頁
   function handleSubmit(event) {
@@ -84,19 +95,27 @@ function HomePage() {
         )}
       </section>
 
-      {!keyword && <WatchlistCard />}
-
       {!keyword && (
-        <section className="card popular">
-          <h2 className="section-title">熱門個股</h2>
-          <div className="chips">
-            {POPULAR_STOCKS.map((stock) => (
-              <Link key={stock.stockId} to={`/stocks/${stock.stockId}`} className="chip">
-                {stock.stockId} {stock.name}
-              </Link>
-            ))}
+        <div className="home-grid">
+          {newsReady ? (
+            <NewsList stockIds={newsStockIds} title={watchlist.items.length > 0 ? '自選股與熱門股新聞' : '熱門股新聞'} />
+          ) : (
+            <section className="card news" aria-busy="true" />
+          )}
+          <div className="home-side">
+            <WatchlistCard />
+            <section className="card popular">
+              <h2 className="section-title">熱門個股</h2>
+              <div className="chips">
+                {POPULAR_STOCKS.map((stock) => (
+                  <Link key={stock.stockId} to={`/stocks/${stock.stockId}`} className="chip">
+                    {stock.stockId} {stock.name}
+                  </Link>
+                ))}
+              </div>
+            </section>
           </div>
-        </section>
+        </div>
       )}
     </>
   )

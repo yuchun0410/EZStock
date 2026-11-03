@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { getStock } from '../api/stockApi'
 import DividendSection from '../components/DividendSection'
+import NewsList from '../components/NewsList'
 import PriceSection from '../components/PriceSection'
 import StockKeyStats from '../components/StockKeyStats'
 import StockDiscussion from '../components/StockDiscussion'
@@ -86,6 +87,7 @@ function StockPage() {
       {detail.latestDate && (
         <DividendSection stockId={detail.stockId} latestDate={detail.latestDate} latestClose={detail.latestClose} />
       )}
+      <NewsList stockIds={[detail.stockId]} limit={10} title="相關新聞" showStocks={false} />
       <StockDiscussion stockId={detail.stockId} name={detail.name} />
     </>
   )
