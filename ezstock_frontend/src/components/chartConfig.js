@@ -8,12 +8,12 @@ export const Y_AXIS_WIDTH = 64
 
 // SVG 的屬性不一定吃 CSS 變數，圖表直接用色碼（跟 index.css 的變數同色）
 export const CHART_COLORS = {
-  up: '#d63a3a',
-  down: '#1f9d55',
-  neutral: '#1f3a5f',
-  flat: '#6b7385',
-  grid: '#e1e4ea',
-  axis: '#6b7385',
+  up: '#d23b3b',
+  down: '#13865a',
+  neutral: '#2e3a8c',
+  flat: '#6a6f85',
+  grid: '#eceef3',
+  axis: '#6a6f85',
   surface: '#ffffff',
 }
 

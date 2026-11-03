@@ -95,7 +95,7 @@ function AssetPage() {
 
   return (
     <>
-      <section className="card">
+      <section className="card card-hero">
         <h2 className="section-title">我的資產</h2>
         <div className="asset-hero">
           <span className="stat-label muted">淨資產</span>
