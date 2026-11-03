@@ -11,6 +11,7 @@ import com.ezstock.exception.UnauthorizedException;
 import com.ezstock.security.RefreshTokenCookies;
 import com.ezstock.service.AuthService;
 import com.ezstock.service.AuthService.AuthResult;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,9 +54,13 @@ public class AuthController {
         return withTokens(HttpStatus.CREATED, authService.register(request));
     }
 
+    /**
+     * IP 用 getRemoteAddr()，不自己讀 X-Forwarded-For（使用者可以隨便偽造這個 header）。
+     * 部署到反向代理後面時，設定 server.forward-headers-strategy 讓 Spring 從可信任的代理取得真正的 IP。
+     */
     @PostMapping("/login")
-    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
-        return withTokens(HttpStatus.OK, authService.login(request));
+    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
+        return withTokens(HttpStatus.OK, authService.login(request, http.getRemoteAddr()));
     }
 
     /** Google 登入：前端把 Google 按鈕給的 ID Token 送來，後端驗證後發我們自己的 JWT */

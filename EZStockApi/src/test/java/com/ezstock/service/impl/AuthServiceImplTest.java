@@ -5,12 +5,14 @@ import com.ezstock.dto.LoginRequest;
 import com.ezstock.dto.RegisterRequest;
 import com.ezstock.exception.BadRequestException;
 import com.ezstock.exception.ConflictException;
+import com.ezstock.exception.TooManyRequestsException;
 import com.ezstock.exception.UnauthorizedException;
 import com.ezstock.model.Member;
 import com.ezstock.security.AccessToken;
 import com.ezstock.security.AccessTokenBlacklist;
 import com.ezstock.security.GoogleIdTokenVerifier;
 import com.ezstock.security.GoogleUser;
+import com.ezstock.security.LoginAttemptLimiter;
 import com.ezstock.security.RefreshTokenStore;
 import com.ezstock.security.TokenService;
 import com.ezstock.service.AuthService.AuthResult;
@@ -47,6 +49,7 @@ import static org.mockito.Mockito.when;
 class AuthServiceImplTest {
 
     private static final String PASSWORD = "correct-password";
+    private static final String IP = "203.0.113.10";
     private static final Instant NOW = Instant.parse("2026-10-29T06:00:00Z");
 
     /** 強度 4 是 BCrypt 最低，測試跑比較快；正式環境用預設的 10 */
@@ -58,6 +61,7 @@ class AuthServiceImplTest {
     private AccessTokenBlacklist blacklist;
     private JwtDecoder jwtDecoder;
     private GoogleIdTokenVerifier googleVerifier;
+    private LoginAttemptLimiter loginLimiter;
     private AuthServiceImpl service;
 
     @BeforeEach
@@ -68,9 +72,10 @@ class AuthServiceImplTest {
         blacklist = mock(AccessTokenBlacklist.class);
         jwtDecoder = mock(JwtDecoder.class);
         googleVerifier = mock(GoogleIdTokenVerifier.class);
+        loginLimiter = mock(LoginAttemptLimiter.class);
         Clock clock = Clock.fixed(NOW, ZoneId.of("Asia/Taipei"));
         service = new AuthServiceImpl(memberDao, encoder, tokenService, refreshTokenStore, blacklist, jwtDecoder,
-                googleVerifier, clock);
+                googleVerifier, loginLimiter, clock);
 
         when(memberDao.findByEmail(anyString())).thenReturn(Optional.empty());
         when(memberDao.findByGoogleSub(anyString())).thenReturn(Optional.empty());
@@ -139,11 +144,14 @@ class AuthServiceImplTest {
         Member member = member("a@example.com", PASSWORD);
         when(memberDao.findByEmail("a@example.com")).thenReturn(Optional.of(member));
 
-        AuthResult result = service.login(new LoginRequest(" A@Example.com", PASSWORD));
+        AuthResult result = service.login(new LoginRequest(" A@Example.com", PASSWORD), IP);
 
         assertThat(member.getLastLoginAt()).isEqualTo(LocalDateTime.ofInstant(NOW, ZoneId.of("Asia/Taipei")));
         assertThat(result.refreshToken()).isEqualTo("refresh-1");
         verify(refreshTokenStore).issue(7L);
+        verify(loginLimiter).checkAllowed("a@example.com", IP);
+        verify(loginLimiter).recordSuccess("a@example.com");
+        verify(loginLimiter, never()).recordFailure(anyString(), anyString());
     }
 
     @Test
@@ -154,12 +162,29 @@ class AuthServiceImplTest {
         ReflectionTestUtils.setField(googleOnly, "id", 8L);
         when(memberDao.findByEmail("g@example.com")).thenReturn(Optional.of(googleOnly));
 
-        assertThatThrownBy(() -> service.login(new LoginRequest("a@example.com", "wrong")))
+        assertThatThrownBy(() -> service.login(new LoginRequest("a@example.com", "wrong"), IP))
                 .isInstanceOf(UnauthorizedException.class).hasMessage(AuthServiceImpl.LOGIN_FAILED);
-        assertThatThrownBy(() -> service.login(new LoginRequest("nobody@example.com", PASSWORD)))
+        assertThatThrownBy(() -> service.login(new LoginRequest("nobody@example.com", PASSWORD), IP))
                 .isInstanceOf(UnauthorizedException.class).hasMessage(AuthServiceImpl.LOGIN_FAILED);
-        assertThatThrownBy(() -> service.login(new LoginRequest("g@example.com", PASSWORD)))
+        assertThatThrownBy(() -> service.login(new LoginRequest("g@example.com", PASSWORD), IP))
                 .isInstanceOf(UnauthorizedException.class).hasMessage(AuthServiceImpl.LOGIN_FAILED);
+        verify(refreshTokenStore, never()).issue(anyLong());
+        verify(loginLimiter).recordFailure("a@example.com", IP);
+        verify(loginLimiter).recordFailure("nobody@example.com", IP);
+        verify(loginLimiter).recordFailure("g@example.com", IP);
+        verify(loginLimiter, never()).recordSuccess(anyString());
+    }
+
+    @Test
+    @DisplayName("登入：失敗太多次被鎖住時，連密碼都不檢查，直接回 429")
+    void loginLocked() {
+        when(memberDao.findByEmail("a@example.com")).thenReturn(Optional.of(member("a@example.com", PASSWORD)));
+        doThrow(new TooManyRequestsException("登入失敗次數太多，請 15 分鐘後再試", 900))
+                .when(loginLimiter).checkAllowed("a@example.com", IP);
+
+        assertThatThrownBy(() -> service.login(new LoginRequest("a@example.com", PASSWORD), IP))
+                .isInstanceOf(TooManyRequestsException.class);
+        verify(memberDao, never()).findByEmail(anyString());
         verify(refreshTokenStore, never()).issue(anyLong());
     }
 

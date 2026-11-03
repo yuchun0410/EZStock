@@ -11,7 +11,8 @@ public interface AuthService {
     /** 註冊並直接登入 */
     AuthResult register(RegisterRequest request);
 
-    AuthResult login(LoginRequest request);
+    /** clientIp 用來限制同一個 IP 的登入失敗次數 */
+    AuthResult login(LoginRequest request, String clientIp);
 
     /**
      * Google 登入：用 Google 帳號編號找會員；找不到就用 Email 找，找到就綁定；都沒有就建立新會員。
