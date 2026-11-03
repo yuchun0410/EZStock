@@ -3,6 +3,7 @@ package com.ezstock.controller;
 import com.ezstock.config.RequestLoggingFilter;
 import com.ezstock.dto.MemberResponse;
 import com.ezstock.exception.GlobalExceptionHandler;
+import com.ezstock.exception.TooManyRequestsException;
 import com.ezstock.exception.UnauthorizedException;
 import com.ezstock.security.AccessToken;
 import com.ezstock.security.JwtProperties;
@@ -25,6 +26,8 @@ import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -53,7 +56,7 @@ class AuthControllerTest {
     @Test
     @DisplayName("登入成功：access token 在 body，refresh token 只在 HttpOnly、SameSite=Strict 的 cookie")
     void login() throws Exception {
-        when(authService.login(any())).thenReturn(result());
+        when(authService.login(any(), anyString())).thenReturn(result());
 
         mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"a@example.com\",\"password\":\"secret-123\"}"))
@@ -89,12 +92,27 @@ class AuthControllerTest {
     @Test
     @DisplayName("登入失敗：401")
     void loginFailed() throws Exception {
-        when(authService.login(any())).thenThrow(new UnauthorizedException("Email 或密碼錯誤"));
+        when(authService.login(any(), anyString())).thenThrow(new UnauthorizedException("Email 或密碼錯誤"));
 
         mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"a@example.com\",\"password\":\"wrong\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message").value("Email 或密碼錯誤"));
+    }
+
+    @Test
+    @DisplayName("登入失敗太多次：429，並帶 Retry-After；service 收到的是連線的 IP")
+    void loginTooManyRequests() throws Exception {
+        when(authService.login(any(), anyString()))
+                .thenThrow(new TooManyRequestsException("登入失敗次數太多，請 15 分鐘後再試", 840));
+
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .with(request -> { request.setRemoteAddr("203.0.113.7"); return request; })
+                        .content("{\"email\":\"a@example.com\",\"password\":\"wrong\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string(HttpHeaders.RETRY_AFTER, "840"))
+                .andExpect(jsonPath("$.message").value("登入失敗次數太多，請 15 分鐘後再試"));
+        verify(authService).login(any(), eq("203.0.113.7"));
     }
 
     @Test

@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -57,6 +58,17 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleUnauthorized(UnauthorizedException e) {
         log.warn("驗證失敗：{}", e.getMessage());
         return build(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", e.getMessage());
+    }
+
+    /** 回 429，並用 Retry-After header 告訴對方幾秒後可以再試 */
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ApiError> handleTooManyRequests(TooManyRequestsException e) {
+        log.warn("請求太頻繁：{}", e.getMessage());
+        ApiError body = new ApiError(HttpStatus.TOO_MANY_REQUESTS.value(), "TOO_MANY_REQUESTS", e.getMessage(),
+                MDC.get(RequestLoggingFilter.TRACE_ID));
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(e.getRetryAfterSeconds()))
+                .body(body);
     }
 
     @ExceptionHandler(ForbiddenException.class)

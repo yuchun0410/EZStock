@@ -15,6 +15,7 @@ import com.ezstock.security.AccessTokenBlacklist;
 import com.ezstock.security.GoogleIdTokenVerifier;
 import com.ezstock.security.GoogleUser;
 import com.ezstock.security.LogMasks;
+import com.ezstock.security.LoginAttemptLimiter;
 import com.ezstock.security.RefreshTokenStore;
 import com.ezstock.security.TokenService;
 import com.ezstock.service.AuthService;
@@ -51,6 +52,7 @@ public class AuthServiceImpl implements AuthService {
     private final AccessTokenBlacklist blacklist;
     private final JwtDecoder jwtDecoder;
     private final GoogleIdTokenVerifier googleVerifier;
+    private final LoginAttemptLimiter loginLimiter;
     private final Clock clock;
 
     /** Email 不存在時也跑一次 BCrypt，讓回應時間跟「密碼錯」差不多，避免用時間差猜出帳號存不存在 */
@@ -58,7 +60,8 @@ public class AuthServiceImpl implements AuthService {
 
     public AuthServiceImpl(MemberDao memberDao, PasswordEncoder passwordEncoder, TokenService tokenService,
                            RefreshTokenStore refreshTokenStore, AccessTokenBlacklist blacklist,
-                           JwtDecoder jwtDecoder, GoogleIdTokenVerifier googleVerifier, Clock clock) {
+                           JwtDecoder jwtDecoder, GoogleIdTokenVerifier googleVerifier,
+                           LoginAttemptLimiter loginLimiter, Clock clock) {
         this.memberDao = memberDao;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
@@ -66,6 +69,7 @@ public class AuthServiceImpl implements AuthService {
         this.blacklist = blacklist;
         this.jwtDecoder = jwtDecoder;
         this.googleVerifier = googleVerifier;
+        this.loginLimiter = loginLimiter;
         this.clock = clock;
         this.dummyHash = passwordEncoder.encode("dummy-password-for-timing");
     }
@@ -97,29 +101,38 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public AuthResult login(LoginRequest request) {
+    public AuthResult login(LoginRequest request, String clientIp) {
         String email = Member.normalizeEmail(request.email());
+        loginLimiter.checkAllowed(email, clientIp);
         Member member = memberDao.findByEmail(email).orElse(null);
 
         if (member == null) {
             passwordEncoder.matches(request.password(), dummyHash);
             log.info("[會員] 登入失敗：{} 沒有註冊", LogMasks.email(email));
-            throw new UnauthorizedException(LOGIN_FAILED);
+            throw loginFailed(email, clientIp);
         }
         if (!member.hasPassword()) {
             passwordEncoder.matches(request.password(), dummyHash);
             log.info("[會員] 登入失敗：會員 id={} 沒有設定密碼（只用 Google 登入）", member.getId());
-            throw new UnauthorizedException(LOGIN_FAILED);
+            throw loginFailed(email, clientIp);
         }
         if (!passwordEncoder.matches(request.password(), member.getPasswordHash())) {
             log.info("[會員] 登入失敗：會員 id={} 密碼錯誤", member.getId());
-            throw new UnauthorizedException(LOGIN_FAILED);
+            throw loginFailed(email, clientIp);
         }
+
+        loginLimiter.recordSuccess(email);
 
         member.recordLogin(LocalDateTime.now(clock));
         memberDao.save(member);
         log.info("[會員] 登入成功 id={}", member.getId());
         return issueTokens(member);
+    }
+
+    /** Email 不存在也算一次失敗，不然攻擊者可以從「會不會被鎖」看出哪些 Email 有註冊 */
+    private UnauthorizedException loginFailed(String email, String clientIp) {
+        loginLimiter.recordFailure(email, clientIp);
+        return new UnauthorizedException(LOGIN_FAILED);
     }
 
     @Override
