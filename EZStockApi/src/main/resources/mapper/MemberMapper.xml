@@ -8,6 +8,7 @@
         <result property="email"        column="email"/>
         <result property="passwordHash" column="password_hash"/>
         <result property="googleSub"    column="google_sub"/>
+        <result property="lineUserId"   column="line_user_id"/>
         <result property="displayName"  column="display_name"/>
         <result property="avatarUrl"    column="avatar_url"/>
         <result property="createdAt"    column="created_at"/>
@@ -15,7 +16,7 @@
     </resultMap>
 
     <sql id="columns">
-        id, email, password_hash, google_sub, display_name, avatar_url, created_at, last_login_at
+        id, email, password_hash, google_sub, line_user_id, display_name, avatar_url, created_at, last_login_at
     </sql>
 
     <select id="findById" resultMap="memberMap">
@@ -30,9 +31,19 @@
         SELECT <include refid="columns"/> FROM member WHERE google_sub = #{googleSub}
     </select>
 
+    <select id="findByLineUserId" resultMap="memberMap">
+        SELECT <include refid="columns"/> FROM member WHERE line_user_id = #{lineUserId}
+    </select>
+
+    <select id="findAllLinkedToLine" resultMap="memberMap">
+        SELECT <include refid="columns"/> FROM member WHERE line_user_id IS NOT NULL ORDER BY id
+    </select>
+
     <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
-        INSERT INTO member (email, password_hash, google_sub, display_name, avatar_url, created_at, last_login_at)
-        VALUES (#{email}, #{passwordHash}, #{googleSub}, #{displayName}, #{avatarUrl}, #{createdAt}, #{lastLoginAt})
+        INSERT INTO member (email, password_hash, google_sub, line_user_id, display_name, avatar_url, created_at,
+                            last_login_at)
+        VALUES (#{email}, #{passwordHash}, #{googleSub}, #{lineUserId}, #{displayName}, #{avatarUrl}, #{createdAt},
+                #{lastLoginAt})
     </insert>
 
     <!-- Email 和建立時間不會變，不更新 -->
@@ -40,6 +51,7 @@
         UPDATE member
         SET password_hash = #{passwordHash},
             google_sub    = #{googleSub},
+            line_user_id  = #{lineUserId},
             display_name  = #{displayName},
             avatar_url    = #{avatarUrl},
             last_login_at = #{lastLoginAt}

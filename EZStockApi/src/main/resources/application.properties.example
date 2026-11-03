@@ -35,6 +35,11 @@ ezstock.google.client-id=
 #   EZSTOCK_LINE_CHANNEL_SECRET=<LINE Developers → Basic settings → Channel secret>
 #   EZSTOCK_LINE_CHANNEL_TOKEN=<LINE Developers → Messaging API → Channel access token>
 # 沒設定的話 LINE Bot 不會運作，其他功能不受影響
+# Bot 的 LINE ID（不是密碼），網站的「加好友」連結會用到
+ezstock.line.bot-id=
+# 每日回報：週一到週五 18:00 推播淨資產給綁定 LINE 的會員（等 17:30 的股價更新跑完）
+ezstock.line.report-enabled=true
+ezstock.line.report-cron=0 0 18 * * MON-FRI
 
 finmind.api.url=https://api.finmindtrade.com/api/v4/data
 finmind.api.token=YOUR_FINMIND_TOKEN

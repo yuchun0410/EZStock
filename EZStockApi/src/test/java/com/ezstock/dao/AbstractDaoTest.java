@@ -199,6 +199,12 @@ abstract class AbstractDaoTest {
         assertThat(linked.getLastLoginAt()).isEqualTo(now.plusHours(1));
         assertThat(memberDao.findById(created.getId())).isPresent();
         assertThat(memberDao.findByEmail("nobody@example.com")).isEmpty();
+
+        linked.linkLine("U-dao-test-line-user");
+        memberDao.save(linked);
+        assertThat(memberDao.findByLineUserId("U-dao-test-line-user")).get()
+                .extracting(Member::getId).isEqualTo(created.getId());
+        assertThat(memberDao.findAllLinkedToLine()).extracting(Member::getId).contains(created.getId());
     }
 
     @Test

@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LineSignatureVerifierTest {
 
     private static final String SECRET = "test-channel-secret";
-    private final LineSignatureVerifier verifier = new LineSignatureVerifier(new LineProperties(SECRET, "token"));
+    private final LineSignatureVerifier verifier = new LineSignatureVerifier(new LineProperties(SECRET, "token", null));
 
     @Test
     @DisplayName("用 channel secret 算出來的簽章：通過")
@@ -39,7 +39,7 @@ class LineSignatureVerifierTest {
     @DisplayName("沒有設定 LINE：一律不通過")
     void disabled() throws Exception {
         byte[] body = "{}".getBytes(StandardCharsets.UTF_8);
-        LineSignatureVerifier off = new LineSignatureVerifier(new LineProperties(null, null));
+        LineSignatureVerifier off = new LineSignatureVerifier(new LineProperties(null, null, null));
 
         assertThat(off.isValid(body, sign(body, SECRET))).isFalse();
     }

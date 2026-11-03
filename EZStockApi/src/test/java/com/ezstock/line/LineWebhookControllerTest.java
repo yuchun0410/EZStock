@@ -36,7 +36,7 @@ class LineWebhookControllerTest {
     void setUp() {
         handler = mock(LineCommandHandler.class);
         client = mock(LineMessagingClient.class);
-        LineSignatureVerifier verifier = new LineSignatureVerifier(new LineProperties(SECRET, "token"));
+        LineSignatureVerifier verifier = new LineSignatureVerifier(new LineProperties(SECRET, "token", null));
         mockMvc = MockMvcBuilders.standaloneSetup(
                 new LineWebhookController(verifier, handler, client, JsonMapper.builder().build())).build();
         when(handler.handle(anyString(), anyString())).thenReturn(List.of("2330 台積電"));

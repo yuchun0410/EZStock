@@ -1,10 +1,14 @@
 package com.ezstock.line;
 
 import com.ezstock.dao.DailyPriceDao;
+import com.ezstock.dao.MemberDao;
+import com.ezstock.dto.AssetSummaryResponse;
 import com.ezstock.dao.StockDao;
 import com.ezstock.model.DailyPrice;
+import com.ezstock.model.Member;
 import com.ezstock.model.Stock;
 import com.ezstock.model.StockType;
+import com.ezstock.service.AssetService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,6 +17,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
@@ -21,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -29,6 +35,9 @@ class LineCommandHandlerTest {
     private final Stock tsmc = new Stock("2330", "台積電", StockType.STOCK, "半導體業");
     private StockDao stockDao;
     private DailyPriceDao dailyPriceDao;
+    private LineBindingService bindingService;
+    private MemberDao memberDao;
+    private AssetService assetService;
     private LineCommandHandler handler;
 
     @BeforeEach
@@ -36,7 +45,12 @@ class LineCommandHandlerTest {
         stockDao = mock(StockDao.class);
         dailyPriceDao = mock(DailyPriceDao.class);
         Clock clock = Clock.fixed(Instant.parse("2026-11-02T07:00:00Z"), ZoneId.of("Asia/Taipei"));
-        handler = new LineCommandHandler(stockDao, dailyPriceDao, clock);
+        bindingService = mock(LineBindingService.class);
+        memberDao = mock(MemberDao.class);
+        assetService = mock(AssetService.class);
+        handler = new LineCommandHandler(stockDao, dailyPriceDao, bindingService, memberDao, assetService,
+                new LineMessageFormatter(), mock(LineDailyReportService.class), clock);
+        when(memberDao.findByLineUserId(anyString())).thenReturn(Optional.empty());
 
         when(stockDao.findById(anyString())).thenReturn(Optional.empty());
         when(stockDao.findById("2330")).thenReturn(Optional.of(tsmc));
@@ -71,6 +85,36 @@ class LineCommandHandlerTest {
         when(dailyPriceDao.findByStocksSince(any(), any())).thenReturn(List.of());
 
         assertThat(handler.handle("U1", "2330")).containsExactly("2330 台積電\n最近沒有股價資料。");
+    }
+
+    @Test
+    @DisplayName("綁定：「綁定 123456」與「綁定123456」都可以；錯誤時告訴使用者還能試幾次")
+    void bind() {
+        Member member = Member.withPassword("a@example.com", "hash", "小明", LocalDateTime.now());
+        when(bindingService.bind("U1", "123456")).thenReturn(new LineBindingService.BindResult.Success(member));
+        when(bindingService.bind("U1", "654321")).thenReturn(new LineBindingService.BindResult.WrongCode(3));
+
+        assertThat(handler.handle("U1", "綁定 123456").get(0)).startsWith("綁定成功！小明");
+        assertThat(handler.handle("U1", "綁定654321").get(0)).contains("還可以試 3 次");
+        verify(bindingService).bind("U1", "654321");
+    }
+
+    @Test
+    @DisplayName("資產：沒綁定時提示綁定；綁定後回淨資產明細")
+    void assets() {
+        assertThat(handler.handle("U1", "資產")).containsExactly(LineCommandHandler.NOT_LINKED);
+
+        Member member = Member.withPassword("a@example.com", "hash", "小明", LocalDateTime.now());
+        org.springframework.test.util.ReflectionTestUtils.setField(member, "id", 7L);
+        when(memberDao.findByLineUserId("U2")).thenReturn(Optional.of(member));
+        when(assetService.summary(7L)).thenReturn(new AssetSummaryResponse(
+                new BigDecimal("20000"), new BigDecimal("2370000"), new BigDecimal("2390000"),
+                new BigDecimal("10000"), new BigDecimal("2380000"), new BigDecimal("950000"),
+                new BigDecimal("1420000"), new BigDecimal("149.47"), List.of(), List.of(), List.of()));
+
+        assertThat(handler.handle("U2", "資產").get(0))
+                .startsWith("小明 的資產（11/2）\n淨資產 2,380,000 元")
+                .contains("・股票 2,370,000（未實現 +1,420,000，+149.47%）");
     }
 
     private DailyPrice price(LocalDate date, String close) {

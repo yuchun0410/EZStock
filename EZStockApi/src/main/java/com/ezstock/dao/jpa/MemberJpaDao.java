@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -43,6 +44,20 @@ public class MemberJpaDao implements MemberDao {
         Optional<Member> result = memberRepository.findByGoogleSub(googleSub);
         log.debug("[JPA] 用 Google 帳號查詢會員：{}", result.map(m -> "找到 id=" + m.getId()).orElse("查無"));
         return result;
+    }
+
+    @Override
+    public Optional<Member> findByLineUserId(String lineUserId) {
+        Optional<Member> result = memberRepository.findByLineUserId(lineUserId);
+        log.debug("[JPA] 用 LINE 帳號查詢會員：{}", result.map(m -> "找到 id=" + m.getId()).orElse("查無"));
+        return result;
+    }
+
+    @Override
+    public List<Member> findAllLinkedToLine() {
+        List<Member> members = memberRepository.findByLineUserIdIsNotNullOrderByIdAsc();
+        log.debug("[JPA] 綁定 LINE 的會員共 {} 位", members.size());
+        return members;
     }
 
     @Override
