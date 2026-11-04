@@ -44,6 +44,11 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
 		</dependency>
+		<!-- /actuator/health：給 Render 健康檢查與定時喚醒用 -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
 		<!-- Redis：存 refresh token、登出黑名單、登入失敗次數這類「有時效」的資料 -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
