@@ -1,0 +1,8 @@
+# 不要把這些東西送進 Docker 建置：打包產物、log、本機設定
+target/
+logs/
+http/
+.idea/
+*.iml
+# 本機的 application.properties 有真的密碼，絕對不能進映像檔（映像檔裡改用範本檔）
+src/main/resources/application.properties
