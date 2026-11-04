@@ -1,6 +1,7 @@
 # CI：每次 push 到 main、或對 main 開 PR，自動跑後端測試與前端檢查。
 # 兩個 job 同時跑，任何一個失敗，PR 上就會顯示紅色 ✗。
-name: CI
+# CD：push 到 main（PR 合併）而且兩個檢查都通過，才通知 Render 重新部署後端。
+name: CI / CD
 
 on:
   push:
@@ -106,3 +107,28 @@ jobs:
 
       - name: 打包
         run: npm run build
+
+  deploy:
+    name: 部署後端到 Render
+    # 兩個檢查都過了才部署；而且只有 main 分支（PR 合併後）才部署，開 PR 時不會
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # 同一時間只跑一個部署，新的部署要等舊的跑完（不取消，避免部署到一半被中斷）
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+
+    steps:
+      # Render 的 Deploy Hook 是一個網址，打一下就會從 GitHub 抓最新的 main 重新建置。
+      # 網址本身就等於部署權限，所以存在 GitHub Secrets，不寫在程式碼裡，log 也會自動遮掉。
+      - name: 觸發 Render 部署
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "::warning::還沒設定 RENDER_DEPLOY_HOOK_URL，略過部署"
+            exit 0
+          fi
+          curl --fail --silent --show-error -X POST "$RENDER_DEPLOY_HOOK_URL" > /dev/null
+          echo "已通知 Render 開始部署"
