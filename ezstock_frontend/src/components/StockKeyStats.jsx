@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getPrices } from '../api/stockApi'
 import { toChartPoints } from '../utils/chartData'
-import { formatLots, formatPrice, minusMonths } from '../utils/format'
+import { formatPrice, formatVolume, minusMonths } from '../utils/format'
 
 /**
  * 個股頁上方的重點數據：當日開高低、振幅、成交量，以及 52 週高低區間條。
@@ -48,7 +48,7 @@ function StockKeyStats({ stockId, latestDate, latestClose, change }) {
     { label: '最低', value: formatPrice(today.low), trend: compare(today.low, previousClose) },
     { label: '昨收', value: formatPrice(previousClose) },
     { label: '振幅', value: amplitude == null ? '-' : `${formatPrice(amplitude)}%` },
-    { label: '成交量', value: `${formatLots(today.volume)} 張` },
+    { label: '成交量', value: formatVolume(today.volume, stockId) },
   ]
 
   return (

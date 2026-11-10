@@ -1,5 +1,5 @@
 import { Link } from 'react-router'
-import { formatPrice, formatSigned, trendClass } from '../utils/format'
+import { currencyPrefix, formatPrice, formatSigned, trendClass } from '../utils/format'
 
 /**
  * 文章上的股票標籤：代號、名稱、最新收盤與漲跌幅（漲紅、跌綠，前面加 ▲▼，不只靠顏色分辨）。
@@ -14,7 +14,7 @@ function StockTagChip({ stock, onClick }) {
       </span>
       {stock.close != null && (
         <span className="stock-tag-quote">
-          {formatPrice(stock.close)}
+          {currencyPrefix(stock.stockId) + formatPrice(stock.close)}
           {stock.changePercent != null && (
             <span className={trendClass(stock.changePercent)}>
               {' '}

@@ -4,7 +4,7 @@ import { getConditionTypes } from '../api/backtestApi'
 import { screenStocks } from '../api/screenerApi'
 import ConditionEditor from '../components/ConditionEditor'
 import { useWatchlist } from '../hooks/useWatchlist'
-import { formatPrice, formatSigned, trendClass } from '../utils/format'
+import { currencyPrefix, formatPrice, formatSigned, trendClass } from '../utils/format'
 
 const MAX_RULES = 3
 
@@ -174,7 +174,7 @@ function ScreenerPage() {
                       </td>
                       <td className="muted">{m.industry}</td>
                       <td>{m.date}</td>
-                      <td className="num">{formatPrice(m.close)}</td>
+                      <td className="num">{currencyPrefix(m.stockId) + formatPrice(m.close)}</td>
                       <td className={`num ${trendClass(m.change)}`}>{m.change == null ? '—' : formatSigned(m.change)}</td>
                       <td className={`num ${trendClass(m.change)}`}>
                         {m.changePercent == null ? '—' : `${formatSigned(m.changePercent)}%`}

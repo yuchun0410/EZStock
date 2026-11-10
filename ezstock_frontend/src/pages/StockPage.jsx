@@ -10,6 +10,7 @@ import WatchButton from '../components/WatchButton'
 import { formatPrice, formatSigned, trendClass } from '../utils/format'
 
 const TYPE_LABELS = { STOCK: '股票', ETF: 'ETF' }
+const MARKET_LABELS = { TW: '台股', US: '美股' }
 
 /** 個股頁：網址 /stocks/:stockId */
 function StockPage() {
@@ -47,6 +48,7 @@ function StockPage() {
   }
 
   const { detail } = result
+  const us = detail.market === 'US'
   return (
     <>
       <section className="card card-hero">
@@ -57,6 +59,7 @@ function StockPage() {
           <WatchButton stock={detail} />
         </div>
         <p className="stock-meta muted">
+          <span className={`market-badge ${us ? 'market-us' : 'market-tw'}`}>{MARKET_LABELS[detail.market] ?? '台股'}</span>
           {TYPE_LABELS[detail.type] ?? detail.type}
           {detail.industry && ` · ${detail.industry}`}
         </p>
@@ -67,12 +70,17 @@ function StockPage() {
           <div className="stock-overview">
             <div>
               <div className="stock-price">
-                <span className="stock-close">{formatPrice(detail.latestClose)}</span>
+                <span className="stock-close">
+                  {us && <span className="stock-currency">US$</span>}
+                  {formatPrice(detail.latestClose)}
+                </span>
                 <span className={`stock-change ${trendClass(detail.change)}`}>
                   {formatSigned(detail.change)}（{formatSigned(detail.changePercent)}%）
                 </span>
               </div>
-              <p className="stock-date muted">{detail.latestDate} 收盤</p>
+              <p className="stock-date muted">
+                {detail.latestDate} 收盤{us && '（美東時間）'}
+              </p>
             </div>
             <StockKeyStats
               stockId={detail.stockId}
@@ -84,10 +92,16 @@ function StockPage() {
         )}
       </section>
       {detail.latestDate && <PriceSection stockId={detail.stockId} latestDate={detail.latestDate} />}
-      {detail.latestDate && (
+      {us && detail.latestDate && (
+        <p className="card muted us-price-note">
+          美股走勢圖使用還原股價（已反映股利與分割），所以較早的價格會比當時的實際成交價低一些，
+          長期報酬也包含了股利。資料來源目前沒有美股的股利明細與新聞。
+        </p>
+      )}
+      {!us && detail.latestDate && (
         <DividendSection stockId={detail.stockId} latestDate={detail.latestDate} latestClose={detail.latestClose} />
       )}
-      <NewsList stockIds={[detail.stockId]} limit={10} title="相關新聞" showStocks={false} />
+      {!us && <NewsList stockIds={[detail.stockId]} limit={10} title="相關新聞" showStocks={false} />}
       <StockDiscussion stockId={detail.stockId} name={detail.name} />
     </>
   )

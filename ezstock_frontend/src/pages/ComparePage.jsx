@@ -6,7 +6,7 @@ import CompareTable from '../components/CompareTable'
 import FeeSettings from '../components/FeeSettings'
 import StockPicker from '../components/StockPicker'
 import { isValidDiscount, toDiscountRatio } from '../utils/fee'
-import { formatMoney, minusMonths, toIsoDate } from '../utils/format'
+import { formatMoney, isUsStock, minusMonths, moneyUnit, toIsoDate } from '../utils/format'
 
 const MAX_STOCKS = 5
 
@@ -29,9 +29,18 @@ function ComparePage() {
   const [feeDiscount, setFeeDiscount] = useState('6')
   const [state, setState] = useState({ status: 'idle', response: null, error: null, colors: {} })
 
-  const discountValid = isValidDiscount(includeCosts, feeDiscount)
+  // 台股、美股幣別不同，不能放在一起比（後端也會擋）
+  const usCount = selected.filter((s) => isUsStock(s.stockId)).length
+  const mixedMarkets = usCount > 0 && usCount < selected.length
+  const us = selected.length > 0 && usCount === selected.length
+  const discountValid = us || isValidDiscount(includeCosts, feeDiscount)
   const canSubmit =
-    selected.length > 0 && startDate && Number(capital) >= 1000 && discountValid && state.status !== 'loading'
+    selected.length > 0 &&
+    !mixedMarkets &&
+    startDate &&
+    Number(capital) >= 1000 &&
+    discountValid &&
+    state.status !== 'loading'
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -42,9 +51,10 @@ function ComparePage() {
       stockIds: selected.map((s) => s.stockId),
       startDate,
       initialCapital: Number(capital),
-      reinvestDividends: reinvest,
+      // 美股用還原股價，股利本來就算在裡面；手續費折扣只有台股有
+      reinvestDividends: us ? true : reinvest,
       includeCosts,
-      feeDiscount: toDiscountRatio(includeCosts, feeDiscount),
+      feeDiscount: us ? null : toDiscountRatio(includeCosts, feeDiscount),
     }
     console.info('[標的比較] 送出', request)
     setState((current) => ({ ...current, status: 'loading', error: null }))
@@ -73,6 +83,7 @@ function ComparePage() {
           <div className="form-field">
             <span className="form-label">比較標的（最多 {MAX_STOCKS} 檔）</span>
             <StockPicker selected={selected} onChange={setSelected} max={MAX_STOCKS} />
+            {mixedMarkets && <p className="error">台股和美股的幣別不同，請分開比較</p>}
           </div>
 
           <div className="form-row">
@@ -90,7 +101,7 @@ function ComparePage() {
             </label>
 
             <label className="form-field">
-              <span className="form-label">每檔投入金額（元）</span>
+              <span className="form-label">每檔投入金額（{us ? '美元' : '元'}）</span>
               <input
                 type="number"
                 className="form-input"
@@ -111,18 +122,24 @@ function ComparePage() {
             </label>
           </div>
 
-          <div className="form-row">
-            <label className="form-check">
-              <input type="checkbox" checked={reinvest} onChange={(event) => setReinvest(event.target.checked)} />
-              股利再投入
-            </label>
-            <FeeSettings
-              includeCosts={includeCosts}
-              onIncludeCostsChange={setIncludeCosts}
-              feeDiscount={feeDiscount}
-              onFeeDiscountChange={setFeeDiscount}
-            />
-          </div>
+          {us ? (
+            <p className="muted form-hint">
+              美股使用還原股價，股利已經自動再投入；交易成本以美國券商零手續費計算。
+            </p>
+          ) : (
+            <div className="form-row">
+              <label className="form-check">
+                <input type="checkbox" checked={reinvest} onChange={(event) => setReinvest(event.target.checked)} />
+                股利再投入
+              </label>
+              <FeeSettings
+                includeCosts={includeCosts}
+                onIncludeCostsChange={setIncludeCosts}
+                feeDiscount={feeDiscount}
+                onFeeDiscountChange={setFeeDiscount}
+              />
+            </div>
+          )}
 
           <button type="submit" className="primary-button" disabled={!canSubmit}>
             {state.status === 'loading' ? '計算中…（沒查過的股票要先抓資料）' : '開始比較'}
@@ -140,7 +157,8 @@ function ComparePage() {
       {response && (
         <section className={`card compare-result ${state.status === 'loading' ? 'is-stale' : ''}`}>
           <h2 className="section-title">
-            {response.startDate} ～ {response.endDate}，每檔投入 {formatMoney(response.initialCapital)} 元
+            {response.startDate} ～ {response.endDate}，每檔投入 {formatMoney(response.initialCapital)}{' '}
+            {moneyUnit(response.currency)}
           </h2>
 
           {warnings.length > 0 && (
@@ -154,7 +172,12 @@ function ComparePage() {
             </div>
           )}
 
-          <CompareChart results={response.results} colors={state.colors} initialCapital={Number(response.initialCapital)} />
+          <CompareChart
+            results={response.results}
+            colors={state.colors}
+            initialCapital={Number(response.initialCapital)}
+            unit={moneyUnit(response.currency)}
+          />
           <CompareTable results={response.results} colors={state.colors} />
 
           <details className="assumptions">

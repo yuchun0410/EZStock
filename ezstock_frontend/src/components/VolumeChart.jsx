@@ -8,9 +8,11 @@ const compact = new Intl.NumberFormat('zh-TW', { notation: 'compact', maximumFra
  * 價格和成交量單位差太多，不放在同一張圖用兩個 Y 軸，而是分成上下兩張，
  * 用同一個 syncId 讓滑鼠游標和提示框同步。
  */
-function VolumeChart({ points }) {
+function VolumeChart({ points, us = false }) {
+  // 台股看「張」，美股看「股」
+  const unit = us ? '股' : '張'
   return (
-    <div className="chart chart-volume" role="img" aria-label="成交量（張）">
+    <div className="chart chart-volume" role="img" aria-label={`成交量（${unit}）`}>
       <ResponsiveContainer width="100%" height={96}>
         <BarChart data={points} syncId={CHART_SYNC_ID} barCategoryGap="20%" margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
           <XAxis dataKey="date" hide />
@@ -24,14 +26,14 @@ function VolumeChart({ points }) {
           />
           {/* 只要同步的游標，資訊框已經在價格圖上顯示了 */}
           <Tooltip content={() => null} cursor={{ fill: 'rgba(0, 0, 0, 0.06)' }} isAnimationActive={false} />
-          <Bar dataKey="lots" isAnimationActive={false}>
+          <Bar dataKey={us ? 'volume' : 'lots'} isAnimationActive={false}>
             {points.map((p) => (
               <Cell key={p.date} fill={candleColor(p)} fillOpacity={0.6} />
             ))}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-      <div className="chart-caption muted">成交量（張）</div>
+      <div className="chart-caption muted">成交量（{unit}）</div>
     </div>
   )
 }

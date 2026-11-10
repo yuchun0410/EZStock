@@ -1,12 +1,12 @@
 import { formatMoney, formatPrice, formatSigned, trendClass } from '../utils/format'
 
 /** 條件策略 vs 一直持有：績效對照表 */
-function StrategySummary({ strategy, benchmark }) {
+function StrategySummary({ strategy, benchmark, unit = '元' }) {
   const rows = [
     {
       label: '期末資產',
-      strategy: `${formatMoney(strategy.finalValue)} 元`,
-      benchmark: `${formatMoney(benchmark.finalValue)} 元`,
+      strategy: `${formatMoney(strategy.finalValue)} ${unit}`,
+      benchmark: `${formatMoney(benchmark.finalValue)} ${unit}`,
       better: compare(strategy.finalValue, benchmark.finalValue),
     },
     percentRow('總報酬', strategy.metrics.totalReturnPercent, benchmark.metrics.totalReturnPercent),
@@ -20,13 +20,13 @@ function StrategySummary({ strategy, benchmark }) {
     },
     {
       label: '領到股利',
-      strategy: `${formatMoney(strategy.totalDividends)} 元`,
-      benchmark: `${formatMoney(benchmark.totalDividends)} 元`,
+      strategy: `${formatMoney(strategy.totalDividends)} ${unit}`,
+      benchmark: `${formatMoney(benchmark.totalDividends)} ${unit}`,
     },
     {
       label: '交易成本',
-      strategy: `${formatMoney(strategy.totalCosts)} 元`,
-      benchmark: `${formatMoney(benchmark.totalCosts)} 元`,
+      strategy: `${formatMoney(strategy.totalCosts)} ${unit}`,
+      benchmark: `${formatMoney(benchmark.totalCosts)} ${unit}`,
       better: compare(benchmark.totalCosts, strategy.totalCosts),
     },
     { label: '交易次數', strategy: `${strategy.tradeCount} 筆`, benchmark: '1 筆' },

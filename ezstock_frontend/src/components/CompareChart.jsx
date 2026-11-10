@@ -3,10 +3,10 @@ import { formatMoney, formatTenThousands } from '../utils/format'
 import { CHART_COLORS } from './chartConfig'
 
 /**
- * 資產曲線比較：每一檔一條線，同一個 Y 軸（都是「元」）。
+ * 資產曲線比較：每一檔一條線，同一個 Y 軸（同一次比較都是同一種幣別，台幣「元」或「美元」）。
  * 每一檔的交易日可能不一樣（例如較晚上市），先依日期合併成一張表，缺的那天不畫。
  */
-function CompareChart({ results, colors, initialCapital }) {
+function CompareChart({ results, colors, initialCapital, unit = '元' }) {
   const data = mergeCurves(results)
 
   return (
@@ -31,7 +31,7 @@ function CompareChart({ results, colors, initialCapital }) {
             domain={['auto', 'auto']}
           />
           <Tooltip
-            content={<CompareTooltip results={results} colors={colors} initialCapital={initialCapital} />}
+            content={<CompareTooltip results={results} colors={colors} initialCapital={initialCapital} unit={unit} />}
             cursor={{ stroke: CHART_COLORS.axis, strokeDasharray: '4 4' }}
             isAnimationActive={false}
           />
@@ -61,7 +61,7 @@ function CompareChart({ results, colors, initialCapital }) {
 }
 
 /** 滑鼠移到某一天：列出每一檔當天的資產，由高到低，並顯示相對本金的報酬 */
-function CompareTooltip({ active, payload, label, results, colors, initialCapital }) {
+function CompareTooltip({ active, payload, label, results, colors, initialCapital, unit }) {
   if (!active || !payload?.length) return null
   const rows = payload
     .filter((p) => p.value != null)
@@ -75,7 +75,7 @@ function CompareTooltip({ active, payload, label, results, colors, initialCapita
         return (
           <div key={p.dataKey} className="chart-tooltip-ma">
             <span className="legend-dot" style={{ background: colors[p.dataKey] }} />
-            {p.dataKey} {result?.name}：{formatMoney(p.value)} 元（{percent >= 0 ? '+' : ''}
+            {p.dataKey} {result?.name}：{formatMoney(p.value)} {unit}（{percent >= 0 ? '+' : ''}
             {percent.toFixed(1)}%）
           </div>
         )
