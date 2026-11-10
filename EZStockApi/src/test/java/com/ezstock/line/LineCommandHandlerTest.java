@@ -112,7 +112,7 @@ class LineCommandHandlerTest {
         when(assetService.summary(7L)).thenReturn(new AssetSummaryResponse(
                 new BigDecimal("20000"), new BigDecimal("2370000"), new BigDecimal("2390000"),
                 new BigDecimal("10000"), new BigDecimal("2380000"), new BigDecimal("950000"),
-                new BigDecimal("1420000"), new BigDecimal("149.47"), List.of(), List.of(), List.of()));
+                new BigDecimal("1420000"), new BigDecimal("149.47"), List.of(), List.of(), List.of(), null, null));
 
         assertThat(handler.handle("U2", "資產").get(0))
                 .startsWith("小明 的資產（11/2）\n淨資產 2,380,000 元")

@@ -17,6 +17,8 @@ import com.ezstock.model.MoneyAccount;
 import com.ezstock.model.Stock;
 import com.ezstock.model.StockHolding;
 import com.ezstock.service.AssetService;
+import com.ezstock.service.ExchangeRateService;
+import com.ezstock.service.FxRate;
 import com.ezstock.service.PriceLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,15 +49,18 @@ public class AssetServiceImpl implements AssetService {
     private final StockDao stockDao;
     private final DailyPriceDao dailyPriceDao;
     private final PriceLoader priceLoader;
+    private final ExchangeRateService exchangeRateService;
     private final Clock clock;
 
     public AssetServiceImpl(MoneyAccountDao moneyAccountDao, StockHoldingDao stockHoldingDao, StockDao stockDao,
-                            DailyPriceDao dailyPriceDao, PriceLoader priceLoader, Clock clock) {
+                            DailyPriceDao dailyPriceDao, PriceLoader priceLoader,
+                            ExchangeRateService exchangeRateService, Clock clock) {
         this.moneyAccountDao = moneyAccountDao;
         this.stockHoldingDao = stockHoldingDao;
         this.stockDao = stockDao;
         this.dailyPriceDao = dailyPriceDao;
         this.priceLoader = priceLoader;
+        this.exchangeRateService = exchangeRateService;
         this.clock = clock;
     }
 
@@ -69,15 +74,25 @@ public class AssetServiceImpl implements AssetService {
         BigDecimal cash = sum(accounts, AccountKind.CASH);
         BigDecimal liabilities = sum(accounts, AccountKind.LIABILITY);
 
+        // 有美股才需要匯率，沒有就不去抓
+        boolean hasUs = holdings.stream().anyMatch(h -> h.getStock().isUs());
+        FxRate usdTwd = hasUs ? exchangeRateService.latestUsdTwd().orElse(null) : null;
+        if (hasUs && usdTwd == null) {
+            notes.add("暫時抓不到美元匯率，美股持股沒有算進淨資產");
+        } else if (usdTwd != null) {
+            notes.add("美股以 " + usdTwd.date() + " 臺灣銀行即期中價 1 美元 = " + usdTwd.rate().stripTrailingZeros().toPlainString()
+                    + " 元換算；成本也用這個匯率換算，所以損益不含匯差");
+        }
+
         List<HoldingResponse> holdingResponses = new ArrayList<>();
         BigDecimal stockValue = ZERO;
         BigDecimal stockCost = ZERO;
         for (StockHolding holding : holdings) {
-            HoldingResponse response = toResponse(holding, notes);
+            HoldingResponse response = toResponse(holding, notes, usdTwd);
             holdingResponses.add(response);
-            if (response.marketValue() != null) {
-                stockValue = stockValue.add(response.marketValue());
-                stockCost = stockCost.add(response.cost());
+            if (response.marketValueTwd() != null) {
+                stockValue = stockValue.add(response.marketValueTwd());
+                stockCost = stockCost.add(response.costTwd());
             }
         }
 
@@ -89,7 +104,8 @@ public class AssetServiceImpl implements AssetService {
                 System.currentTimeMillis() - started);
         return new AssetSummaryResponse(cash, stockValue, totalAssets, liabilities, netWorth,
                 stockCost, pnl, percent(pnl, stockCost), holdingResponses,
-                accounts.stream().map(MoneyAccountResponse::from).toList(), notes);
+                accounts.stream().map(MoneyAccountResponse::from).toList(), notes,
+                usdTwd == null ? null : usdTwd.rate(), usdTwd == null ? null : usdTwd.date());
     }
 
     @Override
@@ -128,11 +144,6 @@ public class AssetServiceImpl implements AssetService {
     public AssetSummaryResponse saveHolding(long memberId, String stockId, HoldingRequest request) {
         String id = stockId.trim().toUpperCase();
         Stock stock = stockDao.findById(id).orElseThrow(() -> new ResourceNotFoundException("查無股票 " + id));
-        if (stock.isUs()) {
-            // 資產是用台幣加總，美股要先換算匯率才能算進淨資產，下一階段再開放
-            log.info("[資產] 會員 id={} 想新增美股持股 {}，目前還不支援", memberId, id);
-            throw new BadRequestException("目前持股只支援台股，美股（需要換算匯率）之後會開放");
-        }
         List<StockHolding> current = stockHoldingDao.findByMember(memberId);
         boolean exists = current.stream().anyMatch(h -> h.getId().getStockId().equals(id));
         if (!exists && current.size() >= MAX_HOLDINGS) {
@@ -159,7 +170,7 @@ public class AssetServiceImpl implements AssetService {
      * 一檔持股的現值與損益。先確認股價是最新的（OnDemandPriceLoader 有節流，不會一直打外部 API），
      * 補抓失敗就用資料庫裡現有的最新價格；完全沒有股價就只顯示成本。
      */
-    private HoldingResponse toResponse(StockHolding holding, List<String> notes) {
+    private HoldingResponse toResponse(StockHolding holding, List<String> notes, FxRate usdTwd) {
         Stock stock = holding.getStock();
         String stockId = stock.getStockId();
         BigDecimal cost = holding.getAverageCost().multiply(BigDecimal.valueOf(holding.getShares()))
@@ -170,17 +181,26 @@ public class AssetServiceImpl implements AssetService {
             log.warn("[資產] {} 更新股價失敗，使用資料庫現有價格：{}", stockId, e.getMessage());
         }
 
+        // 換算成台幣的比例：台股是 1；美股是匯率，抓不到就是 null（不換算、不加進合計）
+        BigDecimal toTwd = !stock.isUs() ? BigDecimal.ONE : usdTwd == null ? null : usdTwd.rate();
+        String currency = stock.getMarket().currency();
+
         Optional<DailyPrice> latest = dailyPriceDao.findLatest(stockId);
         if (latest.isEmpty()) {
             notes.add(stockId + " " + stock.getName() + " 沒有股價資料，現值與損益不計入");
-            return new HoldingResponse(stockId, stock.getName(), stock.getType(), holding.getShares(),
-                    holding.getAverageCost(), cost, null, null, null, null, null);
+            return new HoldingResponse(stockId, stock.getName(), stock.getType(), currency, holding.getShares(),
+                    holding.getAverageCost(), cost, null, null, null, null, null, twd(cost, toTwd), null);
         }
         BigDecimal price = latest.get().getClosePrice();
         BigDecimal value = price.multiply(BigDecimal.valueOf(holding.getShares())).setScale(2, RoundingMode.HALF_UP);
         BigDecimal pnl = value.subtract(cost);
-        return new HoldingResponse(stockId, stock.getName(), stock.getType(), holding.getShares(),
-                holding.getAverageCost(), cost, price, latest.get().getTradeDate(), value, pnl, percent(pnl, cost));
+        return new HoldingResponse(stockId, stock.getName(), stock.getType(), currency, holding.getShares(),
+                holding.getAverageCost(), cost, price, latest.get().getTradeDate(), value, pnl, percent(pnl, cost),
+                twd(cost, toTwd), twd(value, toTwd));
+    }
+
+    private static BigDecimal twd(BigDecimal amount, BigDecimal toTwd) {
+        return toTwd == null ? null : amount.multiply(toTwd).setScale(2, RoundingMode.HALF_UP);
     }
 
     private MoneyAccount findAccount(long memberId, long accountId) {
