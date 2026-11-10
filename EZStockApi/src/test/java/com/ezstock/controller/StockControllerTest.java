@@ -7,6 +7,7 @@ import com.ezstock.dto.StockDetail;
 import com.ezstock.dto.StockSummary;
 import com.ezstock.exception.GlobalExceptionHandler;
 import com.ezstock.exception.ResourceNotFoundException;
+import com.ezstock.model.Market;
 import com.ezstock.model.StockType;
 import com.ezstock.service.StockQueryService;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,7 +52,7 @@ class StockControllerTest {
     @DisplayName("搜尋：回傳股票清單，回應標頭帶 traceId")
     void search() throws Exception {
         when(stockQueryService.search("台積"))
-                .thenReturn(List.of(new StockSummary("2330", "台積電", StockType.STOCK, "半導體業")));
+                .thenReturn(List.of(new StockSummary("2330", "台積電", StockType.STOCK, Market.TW, "半導體業")));
 
         mockMvc.perform(get("/api/stocks").param("keyword", "台積"))
                 .andExpect(status().isOk())
@@ -75,7 +76,7 @@ class StockControllerTest {
     @DisplayName("個股：回傳最新行情，日期是 yyyy-MM-dd 字串")
     void detail() throws Exception {
         when(stockQueryService.getDetail("2330")).thenReturn(new StockDetail(
-                "2330", "台積電", StockType.STOCK, "半導體業",
+                "2330", "台積電", StockType.STOCK, Market.TW, "TWD", "半導體業",
                 LocalDate.of(2026, 10, 27), new BigDecimal("1100.00"),
                 new BigDecimal("15.00"), new BigDecimal("1.38")));
 
@@ -83,6 +84,8 @@ class StockControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.latestDate").value("2026-10-27"))
                 .andExpect(jsonPath("$.latestClose").value(1100.00))
+                .andExpect(jsonPath("$.market").value("TW"))
+                .andExpect(jsonPath("$.currency").value("TWD"))
                 .andExpect(jsonPath("$.changePercent").value(1.38));
     }
 

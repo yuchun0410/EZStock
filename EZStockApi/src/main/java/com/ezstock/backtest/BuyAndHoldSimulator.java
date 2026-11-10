@@ -111,8 +111,9 @@ public class BuyAndHoldSimulator {
 
             Dividend dividend = dividendByDate.get(price.getTradeDate());
 
-            // 2. 檢查價格異常跳動（除息會讓參考價下降，要先扣掉股利再比較）
-            if (previousClose != null && !splitToday) {
+            // 2. 檢查價格異常跳動（除息會讓參考價下降，要先扣掉股利再比較）。
+            //    只檢查台股：美股沒有漲跌幅限制，一天漲跌 20% 很正常；而且美股用還原股價，分割已經處理好了
+            if (previousClose != null && !splitToday && !stock.isUs()) {
                 BigDecimal reference = dividend == null
                         ? previousClose : previousClose.subtract(dividend.getCashDividend());
                 if (reference.signum() > 0) {

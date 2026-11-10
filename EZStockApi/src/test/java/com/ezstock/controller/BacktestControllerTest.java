@@ -45,7 +45,7 @@ class BacktestControllerTest {
     void compare() throws Exception {
         LocalDate start = LocalDate.of(2026, 1, 2);
         when(backtestService.compare(any())).thenReturn(new CompareResponse(
-                start, LocalDate.of(2026, 10, 28), new BigDecimal("500000"), true, "不計交易成本",
+                start, LocalDate.of(2026, 10, 28), new BigDecimal("500000"), "TWD", true, "不計交易成本",
                 List.of(), List.of("起始日之後的第一個交易日，用開盤價買進")));
 
         mockMvc.perform(post("/api/backtests/compare")

@@ -6,6 +6,7 @@ import com.ezstock.backtest.cost.CostModel;
 import com.ezstock.dto.CompareRequest;
 import com.ezstock.dto.CompareResponse;
 import com.ezstock.exception.BadRequestException;
+import com.ezstock.model.Market;
 import com.ezstock.model.Stock;
 import com.ezstock.service.BacktestService;
 import org.slf4j.Logger;
@@ -17,6 +18,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 用 {@link BacktestDataLoader} 準備資料，再交給 {@link BuyAndHoldSimulator} 計算。
@@ -46,21 +49,26 @@ public class BacktestServiceImpl implements BacktestService {
         List<String> stockIds = new ArrayList<>(new LinkedHashSet<>(
                 request.stockIds().stream().map(String::trim).toList()));
 
-        CostModel costModel = BacktestDataLoader.costModel(request.includeCosts(), request.feeDiscount());
+        // 先把每一檔的資料都準備好，才知道是哪個市場（台股、美股不能混在一起比）
+        List<BacktestDataLoader.StockData> dataList = new ArrayList<>();
+        for (String stockId : stockIds) {
+            dataList.add(dataLoader.load(stockId, period));
+        }
+        Market market = singleMarket(dataList);
+        CostModel costModel = BacktestDataLoader.costModel(market, request.includeCosts(), request.feeDiscount());
         BuyAndHoldSimulator simulator = new BuyAndHoldSimulator(costModel);
-        log.info("[標的比較] 開始：{}，期間 {} ~ {}，每檔投入 {} 元，股利{}，{}",
-                stockIds, period.start(), period.end(), request.initialCapital().toPlainString(),
-                reinvest ? "再投入" : "領現金", costModel.describe());
+        log.info("[標的比較] 開始：{}（{}），期間 {} ~ {}，每檔投入 {} {}，股利{}，{}",
+                stockIds, market, period.start(), period.end(), request.initialCapital().toPlainString(),
+                market.currency(), reinvest ? "再投入" : "領現金", costModel.describe());
 
         List<HoldingResult> results = new ArrayList<>();
-        List<String> assumptions = new ArrayList<>(baseAssumptions(reinvest, costModel));
-        for (String stockId : stockIds) {
-            BacktestDataLoader.StockData data = dataLoader.load(stockId, period);
+        List<String> assumptions = new ArrayList<>(baseAssumptions(market, reinvest, costModel));
+        for (BacktestDataLoader.StockData data : dataList) {
             Stock stock = data.stock();
 
             LocalDate firstTrade = data.prices().getFirst().getTradeDate();
             if (ChronoUnit.DAYS.between(period.start(), firstTrade) > LATE_START_WARNING_DAYS) {
-                String note = stockId + " " + stock.getName() + " 最早的價格是 " + firstTrade
+                String note = stock.getStockId() + " " + stock.getName() + " 最早的價格是 " + firstTrade
                         + "，可能當時還沒上市或資料庫沒有更早的資料，所以從這天才買進";
                 log.warn("[標的比較] {}", note);
                 assumptions.add(note);
@@ -78,13 +86,34 @@ public class BacktestServiceImpl implements BacktestService {
         }
 
         log.info("[標的比較] 完成：{} 檔，耗時 {} ms", results.size(), System.currentTimeMillis() - started);
-        return new CompareResponse(period.start(), period.end(), request.initialCapital(), reinvest, costModel.describe(),
-                results, assumptions);
+        return new CompareResponse(period.start(), period.end(), request.initialCapital(), market.currency(),
+                reinvest, costModel.describe(), results, assumptions);
     }
 
-    private List<String> baseAssumptions(boolean reinvest, CostModel costModel) {
+    /**
+     * 台股和美股不能放在一起比：一個是台幣、一個是美元，同樣「投入 10 萬」意義不同，
+     * 要換算匯率才比較得公平（下一階段做）。
+     */
+    private Market singleMarket(List<BacktestDataLoader.StockData> dataList) {
+        Set<Market> markets = dataList.stream().map(data -> data.stock().getMarket()).collect(Collectors.toSet());
+        if (markets.size() > 1) {
+            log.info("[標的比較] 拒絕：台股和美股混在一起 {}",
+                    dataList.stream().map(data -> data.stock().getStockId()).toList());
+            throw new BadRequestException("台股和美股的幣別不同，請分開比較");
+        }
+        return markets.iterator().next();
+    }
+
+    private List<String> baseAssumptions(Market market, boolean reinvest, CostModel costModel) {
         List<String> list = new ArrayList<>();
         list.add("起始日之後的第一個交易日，用開盤價買進，可買零股");
+        if (market == Market.US) {
+            list.add("金額單位為美元");
+            list.add(BacktestDataLoader.US_ADJUSTED_PRICE_NOTE);
+            list.add("交易成本：" + costModel.describe());
+            list.add("期末資產以最後一個交易日的收盤價計算，未扣除賣出成本");
+            return list;
+        }
         list.add(reinvest ? "股利在除息日當天以收盤價再投入" : "股利在除息日當天入帳，以現金保留");
         list.add("交易成本：" + costModel.describe());
         list.add("股票分割、面額變更的那天，股數依比例調整（例如 1 拆 4 股數變 4 倍），價值不變");

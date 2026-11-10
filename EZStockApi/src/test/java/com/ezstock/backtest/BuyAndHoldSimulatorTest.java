@@ -4,6 +4,7 @@ import com.ezstock.backtest.cost.TaiwanStockCostModel;
 import com.ezstock.backtest.cost.ZeroCostModel;
 import com.ezstock.model.DailyPrice;
 import com.ezstock.model.Dividend;
+import com.ezstock.model.Market;
 import com.ezstock.model.SplitType;
 import com.ezstock.model.Stock;
 import com.ezstock.model.StockSplit;
@@ -142,6 +143,17 @@ class BuyAndHoldSimulatorTest {
         HoldingResult exDividend = noCost.simulate(stock, prices("100", "90"),
                 List.of(dividend(DAY1.plusDays(1), "8")), List.of(), CAPITAL, false);
         assertThat(exDividend.warnings()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("美股沒有漲跌幅限制，一天跌一半也不產生異常跳動警告")
+    void noAbnormalMoveWarningForUs() {
+        Stock us = new Stock("TESTUS", "Test Inc.", StockType.STOCK, Market.US, null);
+
+        HoldingResult result = noCost.simulate(us, prices("100", "105", "50", "52"),
+                List.of(), List.of(), CAPITAL, false);
+
+        assertThat(result.warnings()).isEmpty();
     }
 
     @Test

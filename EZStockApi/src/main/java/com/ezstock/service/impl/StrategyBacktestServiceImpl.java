@@ -16,6 +16,7 @@ import com.ezstock.dto.StrategyRequest;
 import com.ezstock.dto.StrategyResponse;
 import com.ezstock.exception.BadRequestException;
 import com.ezstock.model.DailyPrice;
+import com.ezstock.model.Market;
 import com.ezstock.service.StrategyBacktestService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,11 +78,12 @@ public class StrategyBacktestServiceImpl implements StrategyBacktestService {
         }
         log.debug("[條件回測] {} 條件最多需要 {} 天的歷史資料，從 {} 開始撈，暖機 {} 根 K 棒",
                 stockId, lookback, loadFrom, data.prices().size() - periodPrices.size());
-        CostModel costModel = BacktestDataLoader.costModel(request.includeCosts(), request.feeDiscount());
+        Market market = data.stock().getMarket();
+        CostModel costModel = BacktestDataLoader.costModel(market, request.includeCosts(), request.feeDiscount());
         boolean reinvest = request.reinvestDividends() == null || request.reinvestDividends();
-        log.info("[條件回測] 開始：{} {}，期間 {} ~ {}，本金 {} 元，買進「{}」，賣出「{}」，股利{}，{}",
+        log.info("[條件回測] 開始：{} {}，期間 {} ~ {}，本金 {} {}，買進「{}」，賣出「{}」，股利{}，{}",
                 stockId, data.stock().getName(), period.start(), period.end(),
-                request.initialCapital().toPlainString(), entry.describe(), exit.describe(),
+                request.initialCapital().toPlainString(), market.currency(), entry.describe(), exit.describe(),
                 reinvest ? "再投入" : "領現金", costModel.describe());
 
         StrategyResult strategy;
@@ -101,27 +103,34 @@ public class StrategyBacktestServiceImpl implements StrategyBacktestService {
                 strategy.tradeCount(), System.currentTimeMillis() - started);
 
         return new StrategyResponse(stockId, data.stock().getName(), period.start(), period.end(),
-                request.initialCapital(), reinvest, entry.describe(), exit.describe(), costModel.describe(),
-                strategy, benchmark, assumptions(costModel, reinvest, strategy, benchmark));
+                request.initialCapital(), market.currency(), reinvest, entry.describe(), exit.describe(),
+                costModel.describe(), strategy, benchmark, assumptions(market, costModel, reinvest, strategy, benchmark));
     }
 
     private List<ConditionRule> toRules(List<ConditionSpec> specs) {
         return specs.stream().map(spec -> new ConditionRule(spec.type(), spec.value())).toList();
     }
 
-    private List<String> assumptions(CostModel costModel, boolean reinvest,
+    private List<String> assumptions(Market market, CostModel costModel, boolean reinvest,
                                      StrategyResult strategy, HoldingResult benchmark) {
         List<String> list = new ArrayList<>();
         list.add("每天收盤後判斷條件，成立的話隔天以開盤價成交（收盤時才知道條件成立，不能用當天價格成交）");
         list.add("空手時只看買進條件，持有時只看賣出條件；同一時間最多持有一筆，每次買進用全部現金");
         list.add("均線、近期高低點會往起始日之前多抓資料來計算（例如年線要 240 個交易日），回測一開始就能判斷條件；"
                 + "如果資料庫沒有那麼早的價格，一開始的幾天不會產生訊號");
-        list.add(reinvest
-                ? "持有期間領到的股利，在除息日以收盤價再投入；空手時遇到除息領不到股利"
-                : "持有期間領到的股利存成現金，下次買進時一起使用；空手時遇到除息領不到股利");
-        list.add("持有期間遇到股票分割，股數與買進價依比例調整");
+        if (market == Market.US) {
+            list.add("金額單位為美元");
+            list.add(BacktestDataLoader.US_ADJUSTED_PRICE_NOTE);
+        } else {
+            list.add(reinvest
+                    ? "持有期間領到的股利，在除息日以收盤價再投入；空手時遇到除息領不到股利"
+                    : "持有期間領到的股利存成現金，下次買進時一起使用；空手時遇到除息領不到股利");
+            list.add("持有期間遇到股票分割，股數與買進價依比例調整");
+        }
         list.add("交易成本：" + costModel.describe());
-        list.add("對照組「一直持有」：起始日開盤買進持有到最後，股利" + (reinvest ? "同樣再投入" : "同樣存成現金"));
+        list.add(market == Market.US
+                ? "對照組「一直持有」：起始日開盤買進持有到最後"
+                : "對照組「一直持有」：起始日開盤買進持有到最後，股利" + (reinvest ? "同樣再投入" : "同樣存成現金"));
         list.add("期末仍持有的部位以最後收盤價估值，未扣除賣出成本");
         if (strategy.pendingSignal() != null) {
             list.add(strategy.pendingSignal());
