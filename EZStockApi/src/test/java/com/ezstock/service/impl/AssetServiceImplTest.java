@@ -17,6 +17,8 @@ import com.ezstock.model.MoneyAccount;
 import com.ezstock.model.Stock;
 import com.ezstock.model.StockHolding;
 import com.ezstock.model.StockType;
+import com.ezstock.service.ExchangeRateService;
+import com.ezstock.service.FxRate;
 import com.ezstock.service.PriceLoader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -58,6 +60,7 @@ class AssetServiceImplTest {
     private StockDao stockDao;
     private DailyPriceDao dailyPriceDao;
     private PriceLoader priceLoader;
+    private ExchangeRateService exchangeRateService;
     private AssetServiceImpl service;
 
     @BeforeEach
@@ -67,8 +70,10 @@ class AssetServiceImplTest {
         stockDao = mock(StockDao.class);
         dailyPriceDao = mock(DailyPriceDao.class);
         priceLoader = mock(PriceLoader.class);
+        exchangeRateService = mock(ExchangeRateService.class);
         Clock clock = Clock.fixed(Instant.parse("2026-11-02T04:00:00Z"), ZoneId.of("Asia/Taipei"));
-        service = new AssetServiceImpl(moneyAccountDao, stockHoldingDao, stockDao, dailyPriceDao, priceLoader, clock);
+        service = new AssetServiceImpl(moneyAccountDao, stockHoldingDao, stockDao, dailyPriceDao, priceLoader,
+                exchangeRateService, clock);
 
         when(moneyAccountDao.findByMember(ME)).thenReturn(List.of(
                 account(1L, AccountKind.CASH, "活存", "200000"),
@@ -182,14 +187,55 @@ class AssetServiceImplTest {
     }
 
     @Test
-    @DisplayName("持股：美股要換算匯率，這一版先不開放，回 400 而且不寫入")
-    void rejectUsHolding() {
-        when(stockDao.findById("AAPL")).thenReturn(Optional.of(
-                new Stock("AAPL", "Apple Inc.", StockType.STOCK, Market.US, null)));
+    @DisplayName("美股持股：金額保留美元，用最新匯率換算成台幣後加進淨資產")
+    void usHoldingConvertedToTwd() {
+        Stock apple = new Stock("AAPL", "Apple Inc.", StockType.STOCK, Market.US, null);
+        when(stockHoldingDao.findByMember(ME)).thenReturn(List.of(
+                new StockHolding(ME, tsmc, 100, new BigDecimal("1000"), T),
+                new StockHolding(ME, apple, 10, new BigDecimal("200"), T)));
+        when(dailyPriceDao.findLatest("AAPL")).thenReturn(Optional.of(price(apple, "250")));
+        when(exchangeRateService.latestUsdTwd()).thenReturn(Optional.of(
+                new FxRate("USD", new BigDecimal("32.5"), LocalDate.of(2026, 10, 30))));
 
-        assertThatThrownBy(() -> service.saveHolding(ME, "aapl", new HoldingRequest(10L, new BigDecimal("200"))))
-                .isInstanceOf(BadRequestException.class).hasMessageContaining("美股");
-        verify(stockHoldingDao, never()).upsert(any());
+        AssetSummaryResponse summary = service.summary(ME);
+
+        HoldingResponse appleRow = summary.holdings().get(1);
+        assertThat(appleRow.currency()).isEqualTo("USD");
+        // 10 股 × 250 美元 = 2500 美元 = 81250 元；成本 2000 美元 = 65000 元
+        assertThat(appleRow.marketValue()).isEqualByComparingTo("2500");
+        assertThat(appleRow.marketValueTwd()).isEqualByComparingTo("81250");
+        assertThat(appleRow.returnPercent()).isEqualByComparingTo("25");
+        // 台積電 110000 + Apple 81250
+        assertThat(summary.stockValue()).isEqualByComparingTo("191250");
+        assertThat(summary.stockCost()).isEqualByComparingTo("165000");
+        assertThat(summary.usdTwdRate()).isEqualByComparingTo("32.5");
+        assertThat(summary.notes()).anyMatch(text -> text.contains("32.5"));
+    }
+
+    @Test
+    @DisplayName("美股持股：抓不到匯率時不算進淨資產，並提醒使用者；台股照常")
+    void usHoldingWithoutRate() {
+        Stock apple = new Stock("AAPL", "Apple Inc.", StockType.STOCK, Market.US, null);
+        when(stockHoldingDao.findByMember(ME)).thenReturn(List.of(
+                new StockHolding(ME, tsmc, 100, new BigDecimal("1000"), T),
+                new StockHolding(ME, apple, 10, new BigDecimal("200"), T)));
+        when(dailyPriceDao.findLatest("AAPL")).thenReturn(Optional.of(price(apple, "250")));
+        when(exchangeRateService.latestUsdTwd()).thenReturn(Optional.empty());
+
+        AssetSummaryResponse summary = service.summary(ME);
+
+        assertThat(summary.stockValue()).isEqualByComparingTo("110000");
+        assertThat(summary.holdings().get(1).marketValue()).isEqualByComparingTo("2500");
+        assertThat(summary.holdings().get(1).marketValueTwd()).isNull();
+        assertThat(summary.notes()).anyMatch(text -> text.contains("匯率"));
+    }
+
+    @Test
+    @DisplayName("沒有美股持股就不去抓匯率")
+    void noRateWithoutUsHolding() {
+        service.summary(ME);
+
+        verify(exchangeRateService, never()).latestUsdTwd();
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.ezstock.datasource.finmind;
 
 import com.ezstock.datasource.CashDividend;
+import com.ezstock.datasource.ExchangeRate;
 import com.ezstock.datasource.NewsItem;
 import com.ezstock.datasource.PriceBar;
 import com.ezstock.datasource.ShareSplit;
@@ -235,6 +236,27 @@ class FinMindDataSourceTest {
         assertThat(FinMindDataSource.cleanUsName("NVIDIA Corporation Common Stock")).isEqualTo("NVIDIA Corporation");
         assertThat(FinMindDataSource.cleanUsName("Alphabet Inc. Class A Common Stock")).isEqualTo("Alphabet Inc. Class A");
         assertThat(FinMindDataSource.cleanUsName("x".repeat(150))).hasSize(FinMindDataSource.NAME_MAX_LENGTH);
+    }
+
+    @Test
+    @DisplayName("匯率：帶幣別參數，略過沒有報價（-99）的日子，依日期排序")
+    void fetchExchangeRates() {
+        setUp("my-token");
+        server.expect(queryParam("dataset", "TaiwanExchangeRate"))
+                .andExpect(queryParam("data_id", "USD"))
+                .andRespond(withSuccess("""
+                        {"msg":"success","status":200,"data":[
+                          {"date":"2026-11-09","currency":"USD","cash_buy":32.49,"cash_sell":33.16,"spot_buy":32.84,"spot_sell":32.94},
+                          {"date":"2026-11-08","currency":"USD","cash_buy":32.4,"cash_sell":33.0,"spot_buy":-99,"spot_sell":-99},
+                          {"date":"2026-11-06","currency":"USD","cash_buy":32.37,"cash_sell":33.04,"spot_buy":32.72,"spot_sell":32.82}
+                        ]}""", MediaType.APPLICATION_JSON));
+
+        List<ExchangeRate> rates = dataSource.fetchExchangeRates("USD", LocalDate.of(2026, 10, 27), LocalDate.of(2026, 11, 10));
+
+        server.verify();
+        assertThat(rates).extracting(ExchangeRate::date)
+                .containsExactly(LocalDate.of(2026, 11, 6), LocalDate.of(2026, 11, 9));
+        assertThat(rates.get(1).mid()).isEqualByComparingTo("32.89");
     }
 
     @Test

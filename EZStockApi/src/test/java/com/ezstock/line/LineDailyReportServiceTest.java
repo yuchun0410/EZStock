@@ -36,7 +36,7 @@ class LineDailyReportServiceTest {
     private static final AssetSummaryResponse SUMMARY = new AssetSummaryResponse(
             new BigDecimal("20000"), new BigDecimal("2370000"), new BigDecimal("2390000"),
             new BigDecimal("10000"), new BigDecimal("2380000"), new BigDecimal("950000"),
-            new BigDecimal("1420000"), new BigDecimal("149.47"), List.of(), List.of(), List.of());
+            new BigDecimal("1420000"), new BigDecimal("149.47"), List.of(), List.of(), List.of(), null, null);
 
     private AssetService assetService;
     private WatchlistService watchlistService;

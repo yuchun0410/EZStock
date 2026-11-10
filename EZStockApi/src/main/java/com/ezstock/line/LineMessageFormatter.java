@@ -41,6 +41,14 @@ public class LineMessageFormatter {
                         .append(' ').append(new DecimalFormat("#,##0").format(h.shares())).append(" 股");
                 if (h.marketValue() == null) {
                     text.append("｜沒有股價");
+                } else if ("USD".equals(h.currency())) {
+                    // 美股：金額是美元，後面附上換算的台幣
+                    text.append("｜現值 US$").append(money(h.marketValue()));
+                    if (h.marketValueTwd() != null) {
+                        text.append("（約 ").append(money(h.marketValueTwd())).append(" 元）");
+                    }
+                    text.append("｜").append(signedMoney(h.unrealizedPnl())).append(" 美元")
+                            .append("（").append(signedPercent(h.returnPercent())).append("）");
                 } else {
                     text.append("｜現值 ").append(money(h.marketValue()))
                             .append("｜").append(signedMoney(h.unrealizedPnl()))

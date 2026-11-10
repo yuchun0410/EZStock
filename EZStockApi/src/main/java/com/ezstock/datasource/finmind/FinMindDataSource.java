@@ -1,6 +1,7 @@
 package com.ezstock.datasource.finmind;
 
 import com.ezstock.datasource.CashDividend;
+import com.ezstock.datasource.ExchangeRate;
 import com.ezstock.datasource.MarketDataSource;
 import com.ezstock.datasource.NewsItem;
 import com.ezstock.datasource.PriceBar;
@@ -288,6 +289,27 @@ public class FinMindDataSource implements MarketDataSource {
                     splits.stream().map(s -> s.date() + " " + s.type()).toList());
         }
         return splits;
+    }
+
+    /**
+     * 匯率（臺灣銀行牌告，FinMind 的 TaiwanExchangeRate）。
+     * 沒有報價的日子買入、賣出會是 -99，這種資料略過。
+     */
+    @Override
+    public List<ExchangeRate> fetchExchangeRates(String currency, LocalDate from, LocalDate to) {
+        List<FinMindDto.ExchangeRateRow> rows = call("TaiwanExchangeRate", currency, from, to,
+                new ParameterizedTypeReference<FinMindDto.Response<FinMindDto.ExchangeRateRow>>() {
+                });
+        List<ExchangeRate> rates = new ArrayList<>();
+        for (FinMindDto.ExchangeRateRow row : rows) {
+            if (row.date() == null || row.spotBuy() == null || row.spotSell() == null
+                    || row.spotBuy().signum() <= 0 || row.spotSell().signum() <= 0) {
+                continue;
+            }
+            rates.add(new ExchangeRate(currency, LocalDate.parse(row.date()), row.spotBuy(), row.spotSell()));
+        }
+        rates.sort(Comparator.comparing(ExchangeRate::date));
+        return rates;
     }
 
     /**

@@ -42,7 +42,7 @@ class AssetControllerTest {
     private static final AssetSummaryResponse SUMMARY = new AssetSummaryResponse(
             new BigDecimal("300000"), new BigDecimal("200500"), new BigDecimal("500500"),
             new BigDecimal("150000"), new BigDecimal("350500"), new BigDecimal("201000"),
-            new BigDecimal("-500"), new BigDecimal("-0.25"), List.of(), List.of(), List.of());
+            new BigDecimal("-500"), new BigDecimal("-0.25"), List.of(), List.of(), List.of(), null, null);
 
     private AssetService service;
     private MockMvc mockMvc;

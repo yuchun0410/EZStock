@@ -1,11 +1,17 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { formatMoney, formatPrice, formatSigned, formatSignedMoney, trendClass } from '../utils/format'
+
+/** 美股的金額是美元，前面加 US$；台股不加 */
+function usd(h) {
+  return h.currency === 'USD' ? 'US$' : ''
+}
 import StockPicker from './StockPicker'
 
 /**
  * 持股表格：每檔的成本、現價、現值、損益、報酬率，可以新增、修改、刪除。
  * 同一檔再新增一次就是修改（後端用 PUT，同一檔只會有一筆）。
+ * 美股的成本、現價、損益是美元，現值下面附上換算的台幣（淨資產用的是台幣）。
  */
 function HoldingTable({ holdings, busy, onSave, onDelete }) {
   const [stocks, setStocks] = useState([])
@@ -58,14 +64,19 @@ function HoldingTable({ holdings, busy, onSave, onDelete }) {
                     </Link>
                   </td>
                   <td className="num">{formatMoney(h.shares)}</td>
-                  <td className="num">{formatPrice(h.averageCost)}</td>
+                  <td className="num">{usd(h) + formatPrice(h.averageCost)}</td>
                   <td className="num">
-                    {h.price == null ? '—' : formatPrice(h.price)}
+                    {h.price == null ? '—' : usd(h) + formatPrice(h.price)}
                     {h.priceDate && <div className="muted asset-price-date">{h.priceDate}</div>}
                   </td>
-                  <td className="num">{h.marketValue == null ? '—' : formatMoney(h.marketValue)}</td>
+                  <td className="num">
+                    {h.marketValue == null ? '—' : usd(h) + formatMoney(h.marketValue)}
+                    {h.currency === 'USD' && h.marketValueTwd != null && (
+                      <div className="muted asset-price-date">≈ {formatMoney(h.marketValueTwd)} 元</div>
+                    )}
+                  </td>
                   <td className={`num ${trendClass(h.unrealizedPnl)}`}>
-                    {h.unrealizedPnl == null ? '—' : formatSignedMoney(h.unrealizedPnl)}
+                    {h.unrealizedPnl == null ? '—' : `${formatSignedMoney(h.unrealizedPnl)}${h.currency === 'USD' ? ' 美元' : ''}`}
                   </td>
                   <td className={`num ${trendClass(h.returnPercent)}`}>
                     {h.returnPercent == null ? '—' : `${formatSigned(h.returnPercent)}%`}
@@ -109,7 +120,7 @@ function HoldingTable({ holdings, busy, onSave, onDelete }) {
               placeholder="例如 1000"
               required
             />
-            <span className="muted form-hint">1 張 = 1000 股</span>
+            <span className="muted form-hint">台股 1 張 = 1000 股；美股以股計算</span>
           </label>
           <label className="form-field">
             <span className="form-label">每股平均成本</span>
@@ -123,7 +134,7 @@ function HoldingTable({ holdings, busy, onSave, onDelete }) {
               placeholder="例如 950.5"
               required
             />
-            <span className="muted form-hint">建議含手續費</span>
+            <span className="muted form-hint">建議含手續費；美股填美元</span>
           </label>
           <button type="submit" className="primary-button" disabled={busy || stocks.length !== 1}>
             {editingExisting ? '儲存修改' : '新增持股'}
