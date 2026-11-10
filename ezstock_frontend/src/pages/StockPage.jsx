@@ -51,7 +51,7 @@ function StockPage() {
   const us = detail.market === 'US'
   return (
     <>
-      <section className="card card-hero">
+      <section className={`card card-hero hero-${trendClass(detail.change) || 'flat'}`}>
         <div className="stock-heading">
           <h2 className="stock-title">
             {detail.stockId} {detail.name}

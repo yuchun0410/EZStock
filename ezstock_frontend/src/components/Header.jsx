@@ -2,8 +2,8 @@ import { Link, NavLink } from 'react-router'
 import AccountMenu from './AccountMenu'
 
 /*
- * 側邊欄（桌機）／頂欄 + 底部分頁列（手機）。
- * 同一份選單：寬螢幕直排在左邊，窄螢幕用 CSS 改成固定在畫面底部，大拇指按得到。
+ * 上方功能列（桌機）／頂欄 + 底部分頁列（手機）。
+ * 同一份選單：寬螢幕橫排在上方（只顯示文字），窄螢幕用 CSS 改成固定在畫面底部（圖示 + 短名稱），大拇指按得到。
  * 圖示是內嵌的 SVG，用 currentColor，跟著文字顏色變（選中時變品牌色）。
  */
 const NAV_ITEMS = [
@@ -34,7 +34,7 @@ function NavIcon({ name }) {
 
 function Header() {
   return (
-    <header className="sidebar">
+    <header className="topbar">
       <Link to="/" className="logo" aria-label="EZStock 首頁">
         <span className="logo-mark" aria-hidden="true">
           EZ
@@ -54,7 +54,7 @@ function Header() {
           </NavLink>
         ))}
       </nav>
-      <p className="sidebar-note">股價每個交易日收盤後更新</p>
+      <p className="topbar-note">股價每個交易日收盤後更新</p>
       <AccountMenu />
     </header>
   )
