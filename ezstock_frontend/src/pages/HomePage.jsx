@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import MarketOverview from '../components/MarketOverview'
 import NewsList from '../components/NewsList'
 import WatchlistCard from '../components/WatchlistCard'
 import { useStockSearch } from '../hooks/useStockSearch'
@@ -110,6 +111,8 @@ function HomePage() {
           </ul>
         )}
       </section>
+
+      {!keyword && <MarketOverview />}
 
       {!keyword && (
         <div className="home-grid">
