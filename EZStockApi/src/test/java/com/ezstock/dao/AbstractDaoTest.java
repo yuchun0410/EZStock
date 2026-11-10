@@ -388,6 +388,34 @@ abstract class AbstractDaoTest {
     }
 
     @Test
+    @DisplayName("文章：按讚同一個人只算一筆、讚數和瀏覽數原子更新、熱門候選只撈最近的文章")
+    void postLikesAndViews() {
+        LocalDateTime t = LocalDateTime.of(2026, 11, 2, 14, 0);
+        Member author = memberDao.save(Member.withPassword("like@example.com", "hash", "發文者", t));
+        Member fan = memberDao.save(Member.withPassword("fan@example.com", "hash", "讀者", t));
+        Post oldPost = postDao.save(new Post(author, "舊文", "內容", List.of(TEST_STOCK_ID), t.minusDays(40)));
+        Post post = postDao.save(new Post(author, "新文", "內容", List.of(TEST_STOCK_ID), t));
+
+        assertThat(postDao.addLike(post.getId(), fan.getId(), t)).isTrue();
+        assertThat(postDao.addLike(post.getId(), fan.getId(), t)).isFalse();
+        assertThat(postDao.hasLiked(post.getId(), fan.getId())).isTrue();
+        postDao.addLikeCount(post.getId(), 1);
+        postDao.incrementViewCount(post.getId());
+        postDao.incrementViewCount(post.getId());
+
+        Post reloaded = postDao.findById(post.getId()).orElseThrow();
+        assertThat(reloaded.getLikeCount()).isEqualTo(1);
+        assertThat(reloaded.getViewCount()).isEqualTo(2);
+
+        assertThat(postDao.removeLike(post.getId(), fan.getId())).isTrue();
+        assertThat(postDao.removeLike(post.getId(), fan.getId())).isFalse();
+        assertThat(postDao.hasLiked(post.getId(), fan.getId())).isFalse();
+
+        assertThat(postDao.findRecent(TEST_STOCK_ID, t.minusDays(30), 10))
+                .extracting(Post::getTitle).containsExactly("新文").doesNotContain(oldPost.getTitle());
+    }
+
+    @Test
     @DisplayName("留言：依時間排序、含已刪除的，留言數用原子更新加減，修改文章不會蓋掉留言數")
     void comment() {
         LocalDateTime t = LocalDateTime.of(2026, 11, 2, 14, 0);

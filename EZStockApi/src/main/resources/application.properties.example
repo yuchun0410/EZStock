@@ -86,3 +86,7 @@ ezstock.import.us-stock-list=true
 # 週一到週五收盤後，把資料庫裡每一檔股票補上最新資料（秒 分 時 日 月 星期，台灣時間）
 ezstock.update.enabled=true
 ezstock.update.cron=0 30 17 * * MON-FRI
+
+# ---------- 論壇 ----------
+# 熱門排序的時間衰減：越大舊文章掉得越快。文章少的小論壇 0.8；流量大的網站可以調到 1.5
+ezstock.forum.hot-gravity=0.8

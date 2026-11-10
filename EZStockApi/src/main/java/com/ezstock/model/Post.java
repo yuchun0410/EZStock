@@ -45,6 +45,13 @@ public class Post {
     @Column(name = "comment_count", nullable = false, updatable = false)
     private int commentCount;
 
+    /** 讚數、瀏覽數跟留言數一樣，只用原子更新修改（insertable = false：新增時用資料庫的預設值 0） */
+    @Column(name = "like_count", nullable = false, insertable = false, updatable = false)
+    private int likeCount;
+
+    @Column(name = "view_count", nullable = false, insertable = false, updatable = false)
+    private int viewCount;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -98,6 +105,8 @@ public class Post {
     public String getContent() { return content; }
     public Set<String> getStockIds() { return stockIds; }
     public int getCommentCount() { return commentCount; }
+    public int getLikeCount() { return likeCount; }
+    public int getViewCount() { return viewCount; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public LocalDateTime getDeletedAt() { return deletedAt; }

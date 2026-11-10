@@ -1,5 +1,6 @@
 package com.ezstock.service.impl;
 
+import com.ezstock.config.ForumProperties;
 import com.ezstock.dao.CommentDao;
 import com.ezstock.dao.DailyPriceDao;
 import com.ezstock.dao.MemberDao;
@@ -9,6 +10,7 @@ import com.ezstock.dao.StockDao;
 import com.ezstock.dto.AuthorResponse;
 import com.ezstock.dto.CommentRequest;
 import com.ezstock.dto.CommentResponse;
+import com.ezstock.dto.LikeResponse;
 import com.ezstock.dto.PostDetailResponse;
 import com.ezstock.dto.PostPageResponse;
 import com.ezstock.dto.PostRequest;
@@ -24,6 +26,8 @@ import com.ezstock.model.Member;
 import com.ezstock.model.Post;
 import com.ezstock.model.Stock;
 import com.ezstock.service.ForumService;
+import com.ezstock.service.PostSort;
+import com.ezstock.service.PostViewTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -36,6 +40,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -55,6 +60,9 @@ public class ForumServiceImpl implements ForumService {
 
     private static final Logger log = LoggerFactory.getLogger(ForumServiceImpl.class);
     private static final int EXCERPT_LENGTH = 120;
+    /** 熱門文章只從最近 30 天、最多 200 篇裡挑：文章量大的時候，改成定時算好分數存起來（或用 Redis 排行榜） */
+    static final int HOT_WINDOW_DAYS = 30;
+    static final int HOT_CANDIDATES = 200;
     /** 只看最近 14 天的股價：要找到最新和前一個交易日，連假也夠用；太久沒交易的股票就不顯示漲跌 */
     private static final int QUOTE_LOOKBACK_DAYS = 14;
 
@@ -63,42 +71,103 @@ public class ForumServiceImpl implements ForumService {
     private final MemberDao memberDao;
     private final StockDao stockDao;
     private final DailyPriceDao dailyPriceDao;
+    private final PostViewTracker viewTracker;
+    private final ForumProperties forumProperties;
     private final Clock clock;
 
     public ForumServiceImpl(PostDao postDao, CommentDao commentDao, MemberDao memberDao, StockDao stockDao,
-                            DailyPriceDao dailyPriceDao, Clock clock) {
+                            DailyPriceDao dailyPriceDao, PostViewTracker viewTracker,
+                            ForumProperties forumProperties, Clock clock) {
         this.postDao = postDao;
         this.commentDao = commentDao;
         this.memberDao = memberDao;
         this.stockDao = stockDao;
         this.dailyPriceDao = dailyPriceDao;
+        this.viewTracker = viewTracker;
+        this.forumProperties = forumProperties;
         this.clock = clock;
     }
 
     @Override
-    public PostPageResponse listPosts(String stockId, int page) {
+    public PostPageResponse listPosts(String stockId, PostSort sort, int page) {
         if (page < 0) {
             throw new BadRequestException("頁數不能是負數");
         }
         String filter = stockId == null || stockId.isBlank() ? null : stockId.trim().toUpperCase();
-        PageResult<Post> result = postDao.findPage(filter, page, PAGE_SIZE);
+        PageResult<Post> result = sort == PostSort.HOT ? hotPage(filter, page) : postDao.findPage(filter, page, PAGE_SIZE);
         Map<String, StockTag> quotes = stockTags(result.items().stream()
                 .flatMap(post -> post.getStockIds().stream()).collect(Collectors.toSet()));
 
         List<PostSummaryResponse> items = result.items().stream()
                 .map(post -> new PostSummaryResponse(post.getId(), post.getTitle(), excerpt(post.getContent()),
                         AuthorResponse.from(post.getAuthor()), tags(post.getStockIds(), quotes),
-                        post.getCommentCount(), post.getCreatedAt(), isEdited(post)))
+                        post.getCommentCount(), post.getLikeCount(), post.getViewCount(),
+                        post.getCreatedAt(), isEdited(post)))
                 .toList();
         int totalPages = (int) ((result.total() + PAGE_SIZE - 1) / PAGE_SIZE);
-        log.info("[論壇] 文章列表 股票={} 第 {} 頁，本頁 {} 篇，共 {} 篇",
+        log.info("[論壇] 文章列表（{}）股票={} 第 {} 頁，本頁 {} 篇，共 {} 篇", sort == PostSort.HOT ? "熱門" : "最新",
                 filter == null ? "全部" : filter, page, items.size(), result.total());
         return new PostPageResponse(items, page, PAGE_SIZE, result.total(), totalPages);
+    }
+
+    /**
+     * 熱門：先撈最近 30 天的文章（最多 200 篇），在程式裡算熱度分數排序，再切出這一頁。
+     * 分數跟「現在幾點」有關，每次都要重算，不能直接用 SQL 的 ORDER BY 欄位。
+     */
+    private PageResult<Post> hotPage(String stockId, int page) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        double gravity = forumProperties.hotGravity();
+        List<Post> candidates = postDao.findRecent(stockId, now.minusDays(HOT_WINDOW_DAYS), HOT_CANDIDATES);
+        List<Post> sorted = candidates.stream()
+                .sorted(Comparator.comparingDouble((Post post) -> HotScore.of(post, now, gravity)).reversed()
+                        .thenComparing(Post::getCreatedAt, Comparator.reverseOrder())
+                        .thenComparing(Post::getId, Comparator.reverseOrder()))
+                .toList();
+        int from = Math.min(page * PAGE_SIZE, sorted.size());
+        int to = Math.min(from + PAGE_SIZE, sorted.size());
+        return new PageResult<>(sorted.subList(from, to), sorted.size());
     }
 
     @Override
     public PostDetailResponse getPost(long postId, Long viewerId) {
         return detail(findActivePost(postId), viewerId);
+    }
+
+    @Override
+    public PostDetailResponse viewPost(long postId, Long viewerId, String clientIp) {
+        Post post = findActivePost(postId);
+        String viewerKey = viewerId != null ? "member:" + viewerId : "ip:" + clientIp;
+        if (viewTracker.isFirstView(postId, viewerKey)) {
+            postDao.incrementViewCount(postId);
+            log.debug("[論壇] 文章 id={} 瀏覽數 +1（{}）", postId, viewerId != null ? "會員 id=" + viewerId : "訪客");
+            post = postDao.findById(postId).orElse(post);
+        }
+        return detail(post, viewerId);
+    }
+
+    /** 新增按讚和讚數 +1 放在同一個交易；INSERT IGNORE 沒新增（已經按過）就不加，連點兩下也只算一次 */
+    @Override
+    @Transactional
+    public LikeResponse like(long memberId, long postId) {
+        findActivePost(postId);
+        if (postDao.addLike(postId, memberId, LocalDateTime.now(clock))) {
+            postDao.addLikeCount(postId, 1);
+            log.info("[論壇] 會員 id={} 按讚文章 id={}", memberId, postId);
+        } else {
+            log.debug("[論壇] 會員 id={} 已經按過文章 id={} 的讚", memberId, postId);
+        }
+        return new LikeResponse(true, findActivePost(postId).getLikeCount());
+    }
+
+    @Override
+    @Transactional
+    public LikeResponse unlike(long memberId, long postId) {
+        findActivePost(postId);
+        if (postDao.removeLike(postId, memberId)) {
+            postDao.addLikeCount(postId, -1);
+            log.info("[論壇] 會員 id={} 收回文章 id={} 的讚", memberId, postId);
+        }
+        return new LikeResponse(false, findActivePost(postId).getLikeCount());
     }
 
     @Override
@@ -175,6 +244,8 @@ public class ForumServiceImpl implements ForumService {
         return new PostDetailResponse(post.getId(), post.getTitle(), post.getContent(),
                 AuthorResponse.from(post.getAuthor()), tags(post.getStockIds(), stockTags(post.getStockIds())),
                 (int) comments.stream().filter(c -> !c.deleted()).count(),
+                post.getLikeCount(), post.getViewCount(),
+                viewerId != null && postDao.hasLiked(post.getId(), viewerId),
                 post.getCreatedAt(), post.getUpdatedAt(), isEdited(post),
                 viewerId != null && post.isWrittenBy(viewerId), comments);
     }

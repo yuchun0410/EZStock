@@ -1,5 +1,6 @@
 package com.ezstock.service.impl;
 
+import com.ezstock.config.ForumProperties;
 import com.ezstock.dao.CommentDao;
 import com.ezstock.dao.DailyPriceDao;
 import com.ezstock.dao.MemberDao;
@@ -11,6 +12,7 @@ import com.ezstock.dto.CommentResponse;
 import com.ezstock.dto.PostDetailResponse;
 import com.ezstock.dto.PostPageResponse;
 import com.ezstock.dto.PostRequest;
+import com.ezstock.dto.PostSummaryResponse;
 import com.ezstock.exception.BadRequestException;
 import com.ezstock.exception.ForbiddenException;
 import com.ezstock.exception.ResourceNotFoundException;
@@ -20,6 +22,8 @@ import com.ezstock.model.Member;
 import com.ezstock.model.Post;
 import com.ezstock.model.Stock;
 import com.ezstock.model.StockType;
+import com.ezstock.service.PostSort;
+import com.ezstock.service.PostViewTracker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -59,6 +63,7 @@ class ForumServiceImplTest {
     private MemberDao memberDao;
     private StockDao stockDao;
     private DailyPriceDao dailyPriceDao;
+    private PostViewTracker viewTracker;
     private ForumServiceImpl service;
 
     @BeforeEach
@@ -69,7 +74,9 @@ class ForumServiceImplTest {
         stockDao = mock(StockDao.class);
         dailyPriceDao = mock(DailyPriceDao.class);
         Clock clock = Clock.fixed(Instant.parse("2026-11-02T07:00:00Z"), ZoneId.of("Asia/Taipei"));
-        service = new ForumServiceImpl(postDao, commentDao, memberDao, stockDao, dailyPriceDao, clock);
+        viewTracker = mock(PostViewTracker.class);
+        service = new ForumServiceImpl(postDao, commentDao, memberDao, stockDao, dailyPriceDao, viewTracker,
+                new ForumProperties(null), clock);
 
         when(memberDao.findById(1L)).thenReturn(Optional.of(alice));
         when(memberDao.findById(2L)).thenReturn(Optional.of(bob));
@@ -233,6 +240,93 @@ class ForumServiceImplTest {
         Member member = Member.withPassword(name + "@example.com", "hash", name, T);
         ReflectionTestUtils.setField(member, "id", id);
         return member;
+    }
+
+    @Test
+    @DisplayName("熱門：幾天前有讚有留言的文章，排在剛發、只有 1 次瀏覽的文章前面；都沒互動的依時間，新的在前")
+    void hotOrder() {
+        LocalDateTime now = LocalDateTime.of(2026, 11, 2, 15, 0);
+        // 實際遇到的情況：8 天前 1 讚 1 留言 1 瀏覽 vs 剛發 1 瀏覽
+        Post weekOld = post(1L, alice, "台積電還好嗎？", "內容", List.of());
+        Post fresh = post(2L, alice, "剛發", "內容", List.of());
+        Post quietNew = post(3L, alice, "沒人看的新文", "內容", List.of());
+        Post quietOld = post(4L, alice, "沒人看的舊文", "內容", List.of());
+        ReflectionTestUtils.setField(weekOld, "createdAt", now.minusDays(8));
+        ReflectionTestUtils.setField(weekOld, "likeCount", 1);
+        ReflectionTestUtils.setField(weekOld, "commentCount", 1);
+        ReflectionTestUtils.setField(weekOld, "viewCount", 1);
+        ReflectionTestUtils.setField(fresh, "createdAt", now.minusMinutes(1));
+        ReflectionTestUtils.setField(fresh, "viewCount", 1);
+        ReflectionTestUtils.setField(quietNew, "createdAt", now.minusHours(2));
+        ReflectionTestUtils.setField(quietOld, "createdAt", now.minusDays(3));
+        when(postDao.findRecent(eq(null), any(), eq(ForumServiceImpl.HOT_CANDIDATES)))
+                .thenReturn(List.of(fresh, quietOld, weekOld, quietNew));
+
+        PostPageResponse page = service.listPosts(null, PostSort.HOT, 0);
+
+        // 沒互動的兩篇都是 0 分，同分依發文時間，新的在前
+        assertThat(page.items()).extracting(PostSummaryResponse::id).containsExactly(1L, 2L, 3L, 4L);
+        assertThat(page.total()).isEqualTo(4);
+        verify(postDao, never()).findPage(any(), anyInt(), anyInt());
+    }
+
+    @Test
+    @DisplayName("熱度分數：時間越久分數越低；互動越多分數越高")
+    void hotScore() {
+        LocalDateTime now = LocalDateTime.of(2026, 11, 2, 15, 0);
+        double g = ForumProperties.DEFAULT_HOT_GRAVITY;
+        assertThat(HotScore.of(5, 0, 0, now.minusHours(1), now, g))
+                .isGreaterThan(HotScore.of(5, 0, 0, now.minusHours(10), now, g));
+        assertThat(HotScore.of(10, 0, 0, now.minusHours(5), now, g))
+                .isGreaterThan(HotScore.of(1, 0, 0, now.minusHours(5), now, g));
+        // 衰減越強，舊文章掉得越快
+        assertThat(HotScore.of(5, 0, 0, now.minusDays(3), now, 1.5))
+                .isLessThan(HotScore.of(5, 0, 0, now.minusDays(3), now, g));
+        // 剛發的文章（0 互動、0 小時）不會除以 0
+        assertThat(HotScore.of(0, 0, 0, now, now, g)).isZero();
+    }
+
+    @Test
+    @DisplayName("瀏覽：第一次看才 +1；30 分鐘內再看不加；有登入用會員 id，沒登入用 IP 判斷")
+    void viewCount() {
+        Post post = post(10L, alice, "標題", "內容", List.of());
+        when(postDao.findById(10L)).thenReturn(Optional.of(post));
+        when(viewTracker.isFirstView(10L, "member:2")).thenReturn(true, false);
+        when(viewTracker.isFirstView(10L, "ip:1.2.3.4")).thenReturn(true);
+
+        service.viewPost(10L, 2L, "1.2.3.4");
+        service.viewPost(10L, 2L, "1.2.3.4");
+        service.viewPost(10L, null, "1.2.3.4");
+
+        verify(postDao, org.mockito.Mockito.times(2)).incrementViewCount(10L);
+    }
+
+    @Test
+    @DisplayName("按讚：第一次按讚數 +1；已經按過不再加；收回讚 −1，沒按過收回也不會變負的")
+    void like() {
+        Post post = post(10L, alice, "標題", "內容", List.of());
+        when(postDao.findById(10L)).thenReturn(Optional.of(post));
+        when(postDao.addLike(eq(10L), eq(2L), any())).thenReturn(true, false);
+        when(postDao.removeLike(10L, 2L)).thenReturn(true, false);
+
+        assertThat(service.like(2L, 10L).liked()).isTrue();
+        service.like(2L, 10L);
+        verify(postDao, org.mockito.Mockito.times(1)).addLikeCount(10L, 1);
+
+        assertThat(service.unlike(2L, 10L).liked()).isFalse();
+        service.unlike(2L, 10L);
+        verify(postDao, org.mockito.Mockito.times(1)).addLikeCount(10L, -1);
+    }
+
+    @Test
+    @DisplayName("按讚：文章已刪除回 404")
+    void likeDeletedPost() {
+        Post post = post(10L, alice, "標題", "內容", List.of());
+        post.delete(T);
+        when(postDao.findById(10L)).thenReturn(Optional.of(post));
+
+        assertThatThrownBy(() -> service.like(2L, 10L)).isInstanceOf(ResourceNotFoundException.class);
+        verify(postDao, never()).addLike(anyLong(), anyLong(), any());
     }
 
     private static Post post(long id, Member author, String title, String content, List<String> stockIds) {

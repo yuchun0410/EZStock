@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
-import { addComment, deleteComment, deletePost, getPost } from '../api/forumApi'
+import { addComment, deleteComment, deletePost, getPost, likePost, unlikePost } from '../api/forumApi'
+import PostStats, { StatIcon } from '../components/PostStats'
 import StockSparkline from '../components/StockSparkline'
 import StockTagChip from '../components/StockTagChip'
 import { useAuth } from '../hooks/useAuth'
@@ -68,6 +69,29 @@ function PostPage() {
     if (post) setState({ status: 'done', post, error: null })
   }
 
+  /**
+   * 按讚：先馬上改畫面（樂觀更新），按起來不卡；API 回來後用伺服器的數字校正，失敗就改回原本的樣子。
+   * 沒登入的話帶去登入頁，登入完回到這篇。
+   */
+  async function handleLike() {
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: location.pathname } })
+      return
+    }
+    const before = state.post
+    const liking = !before.liked
+    setState({ ...state, post: { ...before, liked: liking, likeCount: before.likeCount + (liking ? 1 : -1) } })
+    try {
+      const result = liking ? await likePost(postId) : await unlikePost(postId)
+      console.info(`[論壇] ${liking ? '按讚' : '收回讚'} 文章 ${postId}，讚數 ${result.likeCount}`)
+      setState((current) => ({ ...current, post: { ...current.post, liked: result.liked, likeCount: result.likeCount } }))
+    } catch (error) {
+      console.warn(`[論壇] ${liking ? '按讚' : '收回讚'}失敗：${error.message}`)
+      setState((current) => ({ ...current, post: before }))
+      setActionError(error)
+    }
+  }
+
   async function handleDeletePost() {
     if (!window.confirm('確定刪除這篇文章？刪除後就看不到了。')) return
     if (await run(() => deletePost(postId), `刪除文章 ${postId}`)) {
@@ -104,6 +128,18 @@ function PostPage() {
           ))}
         </div>
         <div className="post-content">{post.content}</div>
+        <div className="post-reactions">
+          <button
+            type="button"
+            className={`like-button ${post.liked ? 'liked' : ''}`}
+            aria-pressed={post.liked}
+            onClick={handleLike}
+          >
+            <StatIcon name="like" />
+            {post.liked ? '已按讚' : '讚'} {post.likeCount}
+          </button>
+          <PostStats post={post} showLikes={false} />
+        </div>
         {post.stocks.length > 0 && (
           <div className="sparkline-grid">
             {post.stocks.map((stock) => (

@@ -10,6 +10,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -74,6 +75,44 @@ public class PostMyBatisDao implements PostDao {
     public void addCommentCount(long postId, int delta) {
         mapper.addCommentCount(postId, delta);
         log.debug("[MyBatis] 文章 id={} 留言數 {}{}", postId, delta > 0 ? "+" : "", delta);
+    }
+
+    @Override
+    public List<Post> findRecent(String stockId, LocalDateTime since, int limit) {
+        List<Post> posts = mapper.findRecent(stockId, since, limit);
+        attachStockIds(posts);
+        log.debug("[MyBatis] 熱門候選 股票={} {} 之後的文章 {} 篇", stockId == null ? "全部" : stockId, since, posts.size());
+        return posts;
+    }
+
+    @Override
+    @Transactional
+    public boolean addLike(long postId, long memberId, LocalDateTime now) {
+        return mapper.insertLike(postId, memberId, now) == 1;
+    }
+
+    @Override
+    @Transactional
+    public boolean removeLike(long postId, long memberId) {
+        return mapper.deleteLike(postId, memberId) == 1;
+    }
+
+    @Override
+    public boolean hasLiked(long postId, long memberId) {
+        return mapper.countLike(postId, memberId) > 0;
+    }
+
+    @Override
+    @Transactional
+    public void addLikeCount(long postId, int delta) {
+        mapper.addLikeCount(postId, delta);
+        log.debug("[MyBatis] 文章 id={} 讚數 {}{}", postId, delta > 0 ? "+" : "", delta);
+    }
+
+    @Override
+    @Transactional
+    public void incrementViewCount(long postId) {
+        mapper.incrementViewCount(postId);
     }
 
     private void attachStockIds(List<Post> posts) {

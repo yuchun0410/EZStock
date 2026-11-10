@@ -9,6 +9,8 @@
         <result property="title"        column="title"/>
         <result property="content"      column="content"/>
         <result property="commentCount" column="comment_count"/>
+        <result property="likeCount"    column="like_count"/>
+        <result property="viewCount"    column="view_count"/>
         <result property="createdAt"    column="created_at"/>
         <result property="updatedAt"    column="updated_at"/>
         <result property="deletedAt"    column="deleted_at"/>
@@ -20,7 +22,8 @@
     </resultMap>
 
     <sql id="select">
-        SELECT p.id, p.title, p.content, p.comment_count, p.created_at, p.updated_at, p.deleted_at,
+        SELECT p.id, p.title, p.content, p.comment_count, p.like_count, p.view_count,
+               p.created_at, p.updated_at, p.deleted_at,
                m.id AS author_id, m.display_name AS author_name, m.avatar_url AS author_avatar
         FROM post p
         JOIN member m ON m.id = p.member_id
@@ -80,5 +83,35 @@
 
     <update id="addCommentCount">
         UPDATE post SET comment_count = comment_count + #{delta} WHERE id = #{id}
+    </update>
+
+    <!-- 熱門文章的候選：最近一段時間的文章，由新到舊 -->
+    <select id="findRecent" resultMap="postMap">
+        <include refid="select"/>
+        <include refid="activeFilter"/>
+          AND p.created_at &gt;= #{since}
+        ORDER BY p.created_at DESC, p.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- INSERT IGNORE：同一個人已經按過讚（主鍵重複）就略過，影響筆數是 0 -->
+    <insert id="insertLike">
+        INSERT IGNORE INTO post_like (post_id, member_id, created_at) VALUES (#{postId}, #{memberId}, #{now})
+    </insert>
+
+    <delete id="deleteLike">
+        DELETE FROM post_like WHERE post_id = #{postId} AND member_id = #{memberId}
+    </delete>
+
+    <select id="countLike" resultType="long">
+        SELECT COUNT(*) FROM post_like WHERE post_id = #{postId} AND member_id = #{memberId}
+    </select>
+
+    <update id="addLikeCount">
+        UPDATE post SET like_count = like_count + #{delta} WHERE id = #{id}
+    </update>
+
+    <update id="incrementViewCount">
+        UPDATE post SET view_count = view_count + 1 WHERE id = #{id}
     </update>
 </mapper>
