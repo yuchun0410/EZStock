@@ -6,6 +6,7 @@ import ComparePage from './pages/ComparePage'
 import HomePage from './pages/HomePage'
 import StockPage from './pages/StockPage'
 import StrategyPage from './pages/StrategyPage'
+import LineCallbackPage from './pages/LineCallbackPage'
 import LoginPage from './pages/LoginPage'
 import NotFoundPage from './pages/NotFoundPage'
 import PostEditorPage from './pages/PostEditorPage'
@@ -31,6 +32,7 @@ function App() {
           <Route path="/forum/:postId/edit" element={<PostEditorPage />} />
           <Route path="/assets" element={<AssetPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/login/line/callback" element={<LineCallbackPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
