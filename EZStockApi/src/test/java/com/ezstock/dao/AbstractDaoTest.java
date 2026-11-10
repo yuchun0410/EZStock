@@ -6,6 +6,7 @@ import com.ezstock.model.AccountKind;
 import com.ezstock.model.AlertDirection;
 import com.ezstock.model.Comment;
 import com.ezstock.model.Member;
+import com.ezstock.model.Market;
 import com.ezstock.model.MoneyAccount;
 import com.ezstock.model.Post;
 import com.ezstock.model.PriceAlert;
@@ -112,6 +113,35 @@ abstract class AbstractDaoTest {
         assertThat(stockDao.search("測試股票", 1))
                 .extracting(Stock::getStockId)
                 .containsExactly(TEST_STOCK_ID);
+    }
+
+    @Test
+    @DisplayName("股票：市場別存得進去、讀得出來，沒指定的是台股")
+    void stockMarket() {
+        stockDao.save(new Stock("TESTUS", "Test Inc.", StockType.STOCK, Market.US, "Computer Manufacturing"));
+
+        assertThat(stockDao.findById("TESTUS")).get().extracting(Stock::getMarket).isEqualTo(Market.US);
+        assertThat(stockDao.findById(TEST_STOCK_ID)).get().extracting(Stock::getMarket).isEqualTo(Market.TW);
+    }
+
+    @Test
+    @DisplayName("股票：代號完全相符的排第一，就算依字母排在後面")
+    void searchExactFirst() {
+        stockDao.save(new Stock("ATEST9", "測試 A", StockType.STOCK, Market.US, null));
+        stockDao.save(new Stock("TEST9", "測試 B", StockType.STOCK, Market.US, null));
+
+        assertThat(stockDao.search("TEST9", 1)).extracting(Stock::getStockId).containsExactly("TEST9");
+    }
+
+    @Test
+    @DisplayName("日線：可以刪除一檔股票的全部日線（美股還原價改變時重抓用）")
+    void deleteDailyPrices() {
+        dailyPriceDao.insertAll(List.of(
+                price(LocalDate.of(2026, 1, 2), "100.00", "105.50"),
+                price(LocalDate.of(2026, 1, 5), "105.50", "103.00")));
+
+        assertThat(dailyPriceDao.deleteByStock(TEST_STOCK_ID)).isEqualTo(2);
+        assertThat(dailyPriceDao.findLatest(TEST_STOCK_ID)).isEmpty();
     }
 
     @Test

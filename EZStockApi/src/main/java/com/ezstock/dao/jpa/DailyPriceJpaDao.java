@@ -83,4 +83,12 @@ public class DailyPriceJpaDao implements DailyPriceDao {
         log.info("[JPA] 批次新增日線 完成，共 {} 筆", prices.size());
         return prices.size();
     }
+
+    @Override
+    @Transactional
+    public int deleteByStock(String stockId) {
+        int deleted = dailyPriceRepository.deleteByStockId(stockId);
+        log.info("[JPA] 刪除 {} 的日線 共 {} 筆", stockId, deleted);
+        return deleted;
+    }
 }

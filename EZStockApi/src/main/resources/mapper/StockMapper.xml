@@ -7,10 +7,11 @@
         <id     property="stockId"  column="stock_id"/>
         <result property="name"     column="name"/>
         <result property="type"     column="type"/>
+        <result property="market"   column="market"/>
         <result property="industry" column="industry"/>
     </resultMap>
 
-    <sql id="columns">stock_id, name, type, industry</sql>
+    <sql id="columns">stock_id, name, type, market, industry</sql>
 
     <select id="findById" resultMap="stockMap">
         SELECT <include refid="columns"/>
@@ -23,7 +24,7 @@
         FROM stock
         WHERE stock_id LIKE CONCAT('%', #{keyword}, '%')
            OR name     LIKE CONCAT('%', #{keyword}, '%')
-        ORDER BY stock_id
+        ORDER BY CASE WHEN stock_id = #{keyword} THEN 0 ELSE 1 END, stock_id
         LIMIT #{limit}
     </select>
 
@@ -41,11 +42,12 @@
 
     <!-- 不存在就新增，存在就更新 -->
     <insert id="upsert">
-        INSERT INTO stock (stock_id, name, type, industry)
-        VALUES (#{stockId}, #{name}, #{type}, #{industry}) AS new
+        INSERT INTO stock (stock_id, name, type, market, industry)
+        VALUES (#{stockId}, #{name}, #{type}, #{market}, #{industry}) AS new
         ON DUPLICATE KEY UPDATE
             name     = new.name,
             type     = new.type,
+            market   = new.market,
             industry = new.industry
     </insert>
 </mapper>

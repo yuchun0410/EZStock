@@ -29,4 +29,7 @@ public interface DailyPriceDao {
 
     /** 批次新增，回傳新增筆數 */
     int insertAll(List<DailyPrice> prices);
+
+    /** 刪除某檔股票的全部日線，回傳刪除筆數（美股還原價改變、要整段重抓時使用） */
+    int deleteByStock(String stockId);
 }

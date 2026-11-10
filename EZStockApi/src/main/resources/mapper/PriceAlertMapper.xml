@@ -14,13 +14,14 @@
             <id     property="stockId"  column="stock_id"/>
             <result property="name"     column="name"/>
             <result property="type"     column="type"/>
+            <result property="market"   column="market"/>
             <result property="industry" column="industry"/>
         </association>
     </resultMap>
 
     <select id="findActiveByMember" resultMap="priceAlertMap">
         SELECT a.id, a.member_id, a.stock_id, a.direction, a.target_price, a.created_at, a.triggered_at,
-               s.name, s.type, s.industry
+               s.name, s.type, s.market, s.industry
         FROM price_alert a
         JOIN stock s ON s.stock_id = a.stock_id
         WHERE a.member_id = #{memberId} AND a.triggered_at IS NULL

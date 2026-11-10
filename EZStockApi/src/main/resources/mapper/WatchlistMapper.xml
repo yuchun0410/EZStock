@@ -13,13 +13,14 @@
             <id     property="stockId"  column="stock_id"/>
             <result property="name"     column="name"/>
             <result property="type"     column="type"/>
+            <result property="market"   column="market"/>
             <result property="industry" column="industry"/>
         </association>
     </resultMap>
 
     <!-- 一次 JOIN 把股票名稱查出來 -->
     <select id="findByMember" resultMap="watchlistItemMap">
-        SELECT w.member_id, w.stock_id, w.added_at, s.name, s.type, s.industry
+        SELECT w.member_id, w.stock_id, w.added_at, s.name, s.type, s.market, s.industry
         FROM watchlist_item w
         JOIN stock s ON s.stock_id = w.stock_id
         WHERE w.member_id = #{memberId}

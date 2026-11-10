@@ -15,12 +15,13 @@
             <id     property="stockId"  column="stock_id"/>
             <result property="name"     column="name"/>
             <result property="type"     column="type"/>
+            <result property="market"   column="market"/>
             <result property="industry" column="industry"/>
         </association>
     </resultMap>
 
     <select id="findByMember" resultMap="stockHoldingMap">
-        SELECT h.member_id, h.stock_id, h.shares, h.average_cost, h.updated_at, s.name, s.type, s.industry
+        SELECT h.member_id, h.stock_id, h.shares, h.average_cost, h.updated_at, s.name, s.type, s.market, s.industry
         FROM stock_holding h
         JOIN stock s ON s.stock_id = h.stock_id
         WHERE h.member_id = #{memberId}
