@@ -1,17 +1,22 @@
 /* =========================================================
- * 版面：左側欄 + 右邊內容（寬螢幕）；頂欄 + 底部分頁列（手機）
+ * 版面：上方功能列 + 下面內容（寬螢幕）；頂欄 + 底部分頁列（手機）
+ * 內容置中、最寬 1160px，功能列左右留白跟內容對齊
  * ========================================================= */
 .app-shell {
   min-height: 100vh;
+  --content-width: 1160px;
+  --page-gutter: 36px;
+  --topbar-height: 56px;
 }
 
 .main {
-  margin-left: var(--sidebar-width);
-  padding: 32px 40px 64px;
+  padding: calc(var(--topbar-height) + 24px) var(--page-gutter) 64px;
 }
 
 .main > * {
-  max-width: 1040px;
+  max-width: var(--content-width);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* 每一頁的區塊上下間距一致，不用每個元件自己加 margin-top */
@@ -19,17 +24,19 @@
   margin-top: 20px;
 }
 
-/* ---------- 側邊欄 ---------- */
-.sidebar {
+/* ---------- 上方功能列 ---------- */
+.topbar {
   position: fixed;
-  inset: 0 auto 0 0;
-  width: var(--sidebar-width);
+  inset: 0 0 auto 0;
+  height: var(--topbar-height);
   display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding: 24px 16px 20px;
-  background: var(--sidebar-bg);
-  color: var(--sidebar-text);
+  align-items: center;
+  gap: 32px;
+  /* 左右留白：畫面比內容寬時，讓 logo 和帳號跟下面的內容切齊 */
+  padding: 0 max(var(--page-gutter), calc((100% - var(--content-width)) / 2));
+  background: var(--nav-bg);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--nav-text);
   z-index: 20;
 }
 
@@ -37,20 +44,18 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 0 8px;
   text-decoration: none;
+  flex-shrink: 0;
 }
 
-/* 方形印章感的標誌：靛藍底、白字 */
 .logo-mark {
   display: inline-grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  background: var(--gradient-brand);
-  box-shadow: 0 4px 16px rgba(123, 79, 214, 0.45);
-  color: #fff;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
   font-family: var(--font-number);
   font-size: 0.8rem;
   font-weight: 700;
@@ -58,7 +63,7 @@
 }
 
 .logo-text {
-  color: #fff;
+  color: var(--color-text);
   font-family: var(--font-number);
   font-size: 1.125rem;
   font-weight: 700;
@@ -67,46 +72,47 @@
 
 .nav {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-self: stretch;
+  gap: 4px;
 }
 
+/* 每個選項撐滿功能列的高度，選中時底部的品牌色線剛好壓在功能列的分隔線上 */
 .nav-link {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 9px 12px;
-  border-radius: var(--radius-md);
-  color: var(--sidebar-muted);
+  gap: 6px;
+  padding: 0 12px;
+  color: var(--nav-muted);
   text-decoration: none;
+  font-size: 0.95rem;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .nav-link:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #fff;
+  color: var(--color-text);
 }
 
-/* 選中的項目：半透明白底 + 左邊一條漸層亮條 */
 .nav-link.active {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  color: var(--color-primary);
   font-weight: 700;
 }
 
 .nav-link.active::before {
   content: '';
   position: absolute;
-  left: -16px;
-  top: 8px;
-  bottom: 8px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: var(--gradient-brand-bright);
+  left: 12px;
+  right: 12px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--color-primary);
 }
 
+/* 寬螢幕只顯示文字；圖示留給手機的底部分頁列 */
 .nav-icon {
+  display: none;
   width: 20px;
   height: 20px;
   flex-shrink: 0;
@@ -121,32 +127,30 @@
   display: none;
 }
 
-.sidebar-note {
-  margin: auto 0 0;
-  padding: 0 12px;
-  color: var(--sidebar-muted);
+.topbar-note {
+  margin: 0 0 0 auto;
+  color: var(--nav-muted);
   font-size: 0.75rem;
+  white-space: nowrap;
 }
 
-/* ---------- 登入狀態（側邊欄底部） ---------- */
+/* ---------- 登入狀態（功能列右邊） ---------- */
 .account {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 40px;
-  padding: 12px 8px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
 }
 
 .avatar {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--gradient-brand-bright);
-  color: #fff;
+  background: var(--color-sunken);
+  color: var(--color-primary);
   font-size: 0.875rem;
   font-weight: 700;
   object-fit: cover;
@@ -154,22 +158,21 @@
 }
 
 .account-name {
-  flex: 1;
-  min-width: 0;
+  max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.9rem;
   font-weight: 500;
-  color: #fff;
+  color: var(--color-text);
 }
 
 .header-button {
   padding: 6px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--sidebar-text);
+  color: var(--nav-text);
   font-size: 0.85rem;
   text-decoration: none;
   cursor: pointer;
@@ -177,92 +180,89 @@
 }
 
 .header-button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
-/* 沒登入時，「登入」按鈕撐滿側邊欄，比較好按 */
+/* 沒登入時只有「登入」一個按鈕，用品牌色 */
 .account > .header-button:only-child {
-  flex: 1;
-  text-align: center;
-  background: var(--gradient-brand);
+  padding: 7px 18px;
+  background: var(--color-primary);
   border-color: transparent;
-  color: #fff;
-  font-weight: 600;
+  color: var(--color-on-primary);
+  font-weight: 700;
 }
 
 .account > .header-button:only-child:hover {
-  filter: brightness(1.1);
+  background: var(--color-primary-hover);
+}
+
+@media (max-width: 1180px) {
+  .topbar {
+    gap: 20px;
+  }
+
+  .topbar-note {
+    display: none;
+  }
+
+  /* 說明文字藏起來後，改由帳號區自己靠右 */
+  .account {
+    margin-left: auto;
+  }
+
+  .nav-link {
+    padding: 0 8px;
+  }
+
+  .nav-link.active::before {
+    left: 8px;
+    right: 8px;
+  }
 }
 
 /* ---------- 手機：頂欄 + 底部分頁列 ---------- */
 @media (max-width: 860px) {
+  .app-shell {
+    --page-gutter: 16px;
+  }
+
   .main {
-    margin-left: 0;
-    padding: 76px 16px 96px;
-  }
-
-  .sidebar {
-    inset: 0 0 auto 0;
-    width: auto;
-    height: 60px;
-    flex-direction: row;
-    align-items: center;
-    gap: 12px;
-    padding: 0 16px;
-  }
-
-  .logo {
-    padding: 0;
-  }
-
-  .sidebar-note {
-    display: none;
-  }
-
-  .account {
-    margin-left: auto;
-    padding: 0;
-    border-top: none;
+    padding-bottom: 96px;
   }
 
   .account-name {
     display: none;
   }
 
-  .account > .header-button:only-child {
-    flex: none;
-  }
-
   .nav {
     position: fixed;
     inset: auto 0 0 0;
-    flex-direction: row;
     gap: 0;
     padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
-    background: var(--sidebar-bg);
+    background: var(--nav-bg);
+    border-top: 1px solid var(--color-border);
   }
 
   .nav-link {
     flex: 1;
     flex-direction: column;
+    justify-content: center;
     gap: 2px;
     padding: 6px 0;
     font-size: 0.7rem;
   }
 
-  .nav-link.active {
-    background: none;
+  .nav-icon {
+    display: block;
   }
 
   .nav-link.active::before {
     left: 30%;
     right: 30%;
-    top: -6px;
+    top: -7px;
     bottom: auto;
-    width: auto;
-    height: 3px;
-    border-radius: 0 0 3px 3px;
+    border-radius: 0 0 2px 2px;
   }
 
   .nav-label {
@@ -407,10 +407,9 @@
   padding: 10px 22px;
   border: none;
   border-radius: var(--radius-md);
-  background: var(--gradient-brand);
-  box-shadow: 0 4px 14px rgba(75, 63, 176, 0.3);
-  color: #fff;
-  font-weight: 600;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -709,7 +708,7 @@
   background: var(--color-surface);
   color: var(--color-primary);
   font-weight: 600;
-  box-shadow: 0 1px 2px rgba(23, 26, 43, 0.08);
+  box-shadow: inset 0 0 0 1px var(--color-border);
 }
 
 .period-change {
@@ -731,7 +730,7 @@
   border-radius: var(--radius-md);
   padding: 8px 12px;
   font-size: 0.85rem;
-  box-shadow: 0 6px 20px rgba(23, 26, 43, 0.1);
+  box-shadow: 0 8px 24px rgba(90, 62, 40, 0.12);
   font-variant-numeric: tabular-nums;
 }
 
@@ -971,7 +970,7 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  box-shadow: 0 12px 32px rgba(23, 26, 43, 0.12);
+  box-shadow: 0 12px 32px rgba(90, 62, 40, 0.14);
 }
 
 .picker-suggestion {
@@ -1563,121 +1562,60 @@
   border-radius: 50%;
   background: var(--color-surface);
   border: 3px solid var(--color-primary);
-  box-shadow: 0 1px 4px rgba(23, 26, 43, 0.2);
+  box-shadow: 0 0 0 3px var(--color-bg);
   transform: translate(-50%, -50%);
 }
 
 /* =========================================================
- * 主卡（個股價格、淨資產）：靛藍→紫的漸層底、白字、微微發光
- * 卡片裡的漲跌、數字、邊框都換成適合深色底的版本
+ * 主卡（個股價格、淨資產）
+ * 不用漸層裝飾，靠「顏色本身帶資訊」：上緣一條色線跟價格同色，
+ * 漲是紅、跌是綠、平盤或資產頁是品牌色，一眼就知道今天是漲是跌。
  * ========================================================= */
 .card-hero {
   position: relative;
-  overflow: hidden;
-  border: none;
-  background: var(--gradient-hero);
-  color: #fff;
-  box-shadow:
-    0 18px 40px -16px rgba(46, 58, 140, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  border-top: 2px solid var(--hero-accent, var(--color-primary));
+  --hero-accent: var(--color-primary);
 }
 
-.card-hero .muted {
-  color: rgba(230, 232, 245, 0.72);
+.card-hero.hero-up {
+  --hero-accent: var(--color-up);
 }
 
-.card-hero .up {
-  color: #ff9a9a;
+.card-hero.hero-down {
+  --hero-accent: var(--color-down);
 }
 
-.card-hero .down {
-  color: #6fe3b0;
+.card-hero.hero-flat {
+  --hero-accent: var(--color-flat);
 }
 
-.card-hero .stock-change {
-  background: rgba(255, 255, 255, 0.12);
+/* 價格本身跟著漲跌變色（看盤軟體的習慣），漲跌膠囊改成同色的實心底 */
+.card-hero.hero-up .stock-close {
+  color: var(--color-up);
+}
+
+.card-hero.hero-down .stock-close {
+  color: var(--color-down);
 }
 
 .card-hero .stock-change.up {
-  background: rgba(255, 110, 110, 0.18);
-  box-shadow: 0 0 20px rgba(255, 110, 110, 0.25);
-}
-
-.card-hero .stock-change.down {
-  background: rgba(70, 220, 160, 0.16);
-  box-shadow: 0 0 20px rgba(70, 220, 160, 0.22);
-}
-
-.card-hero .stock-close,
-.card-hero .asset-hero-value {
-  text-shadow: 0 2px 24px rgba(177, 123, 255, 0.45);
-}
-
-.card-hero .key-stat {
-  border-left-color: rgba(255, 255, 255, 0.18);
-}
-
-.card-hero .key-stats.is-loading {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.06) 25%, rgba(255, 255, 255, 0.14) 50%, rgba(255, 255, 255, 0.06) 75%);
-  background-size: 200% 100%;
-}
-
-.card-hero .year-range-track {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.12);
-}
-
-.card-hero .year-range-fill {
-  background: linear-gradient(90deg, #6fe3b0, #b17bff 55%, #ff9a9a);
-  opacity: 0.9;
-}
-
-.card-hero .year-range-marker {
-  background: #fff;
-  border-color: #fff;
-  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2), 0 0 16px rgba(255, 255, 255, 0.6);
-}
-
-.card-hero .watch-button {
-  border-color: rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-up);
   color: #fff;
 }
 
-.card-hero .watch-button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.5);
+.card-hero .stock-change.down {
+  background: var(--color-down);
+  color: #fff;
 }
 
-.card-hero .watch-button.watched,
-.card-hero .watch-button.watched span {
-  background: #fff;
-  color: var(--color-primary);
-}
-
-/* 資產主卡裡的小統計：半透明玻璃 */
 .card-hero .stat {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(6px);
-}
-
-.card-hero .allocation-bar {
-  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--color-border);
 }
 
 .card-hero .section-title {
-  color: rgba(230, 232, 245, 0.85);
-  font-size: 1rem;
+  color: var(--color-muted);
+  font-size: 0.95rem;
   font-weight: 500;
-}
-
-.card-hero .error {
-  color: #ffb4b4;
-}
-
-.card-hero .legend-text {
-  color: inherit;
 }
 
 .key-stat dd {
@@ -1844,13 +1782,8 @@
 }
 
 .market-badge.market-us {
-  background: #e8f1ff;
-  color: #1f5fbf;
-}
-
-.card-hero .market-badge {
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
+  background: rgba(63, 111, 181, 0.1);
+  color: #3f6fb5;
 }
 
 .stock-currency {
@@ -1870,4 +1803,101 @@
   margin: 16px 0 8px;
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+/* =========================================================
+ * 首頁：市場概況（四格行情）
+ * 價格跟著漲跌變色，跟個股頁的主卡同一套規則
+ * ========================================================= */
+.market-overview {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.market-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 16px 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: inherit;
+  text-decoration: none;
+  overflow: hidden;
+}
+
+.market-tile:hover {
+  border-color: var(--color-muted);
+}
+
+.market-tile-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.market-tile-name {
+  font-weight: 600;
+}
+
+.market-tile-price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  font-family: var(--font-number);
+  font-variant-numeric: tabular-nums;
+}
+
+.market-tile-close {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.market-tile.up .market-tile-close {
+  color: var(--color-up);
+}
+
+.market-tile.down .market-tile-close {
+  color: var(--color-down);
+}
+
+.market-tile-change {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.market-tile-chart {
+  height: 44px;
+  margin: 0 -16px;
+}
+
+.market-tile-empty {
+  padding: 12px 0 20px;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 860px) {
+  .market-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .market-tile {
+    padding: 12px 12px 0;
+  }
+
+  .market-tile-close {
+    font-size: 1.2rem;
+  }
+
+  .market-tile-chart {
+    margin: 0 -12px;
+  }
 }

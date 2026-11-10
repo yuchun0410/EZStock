@@ -1,45 +1,51 @@
 /*
  * 全站共用的基本樣式。顏色、字型、圓角集中定義成變數，之後要改主題只改這裡。
- * 品牌色取自三峽藍染的靛藍；紅綠只留給漲跌（台股慣例：漲紅、跌綠），其他地方不用，看到紅綠就知道是漲跌。
+ *
+ * 風格：奶茶色的淺色介面。
+ * - 底色是奶泡的米白，卡片再亮一階，邊框和分隔線用淺茶色，整體偏暖、看久不刺眼
+ * - 品牌色是焦糖奶茶的棕色，只用在「可以按的東西」和目前所在的位置
+ * - 紅綠只留給漲跌（台股慣例：漲紅、跌綠），選偏暖的紅綠，跟奶茶色放在一起不突兀
+ * - 數字用 Barlow：接近交易所看板常見的 DIN 字型，窄一點、數字等寬，一排價格上下對齊
  */
 :root {
-  --color-bg: #f4f5f8;
-  --color-surface: #ffffff;
-  --color-sunken: #f7f8fa;
-  --color-text: #171a2b;
-  --color-muted: #6a6f85;
-  --color-border: #e3e5ec;
-  --color-primary: #2e3a8c;
-  --color-primary-hover: #252f75;
-  --color-primary-soft: #eef0fa;
-  --color-accent: #2e3a8c;
-  --color-up: #d23b3b;
-  --color-up-soft: #fcefef;
-  --color-down: #13865a;
-  --color-down-soft: #e8f5ee;
-  /* 側欄與主卡：靛藍 → 紫 的漸層 */
-  --sidebar-bg: linear-gradient(180deg, #161c45 0%, #1c1f52 100%);
-  --sidebar-text: #e6e8f5;
-  --sidebar-muted: #9aa0c8;
-  --gradient-brand: linear-gradient(135deg, #3442a8 0%, #6a46d0 100%);
-  --gradient-brand-bright: linear-gradient(135deg, #6f86ff 0%, #b17bff 100%);
-  --gradient-hero:
-    radial-gradient(120% 140% at 100% 0%, rgba(177, 123, 255, 0.55) 0%, rgba(177, 123, 255, 0) 55%),
-    radial-gradient(90% 120% at 0% 100%, rgba(80, 140, 255, 0.35) 0%, rgba(80, 140, 255, 0) 60%),
-    linear-gradient(135deg, #1e2766 0%, #2e3a8c 45%, #4b35a8 100%);
+  color-scheme: light;
 
-  --color-warn: #8a5a00;
-  --color-warn-soft: #fff6e0;
-  --color-warn-border: #f0d9a0;
+  --color-bg: #f4ede4;
+  --color-surface: #fffcf8;
+  --color-sunken: #f1e8dc;
+  --color-text: #3a2e26;
+  --color-muted: #8a7867;
+  --color-border: #e5d8c7;
+  --color-primary: #9a6a44;
+  --color-primary-hover: #855a38;
+  --color-primary-soft: rgba(154, 106, 68, 0.12);
+  --color-on-primary: #fffaf4;
+  --color-accent: #9a6a44;
+  --color-up: #d1453b;
+  --color-up-soft: rgba(209, 69, 59, 0.1);
+  --color-down: #2f8a5b;
+  --color-down-soft: rgba(47, 138, 91, 0.1);
+  --color-flat: #8a7867;
+
+  /* 功能列比底色再亮一點，跟內容用一條淺茶色細線分開 */
+  --nav-bg: #fbf6f0;
+  --nav-text: #5a4a3e;
+  --nav-muted: #8a7867;
+  /* 舊的漸層變數保留名字，改成純色 */
+  --gradient-brand: var(--color-primary);
+  --gradient-brand-bright: var(--color-primary);
+  --gradient-hero: var(--color-surface);
+
+  --color-warn: #87580e;
+  --color-warn-soft: #fbefd9;
+  --color-warn-border: #ecd2a2;
 
   --font-body: 'Noto Sans TC', system-ui, -apple-system, 'PingFang TC', 'Microsoft JhengHei', sans-serif;
-  /* 數字用 IBM Plex Sans：等寬數字（tabular-nums）讓價格、金額上下對齊 */
-  --font-number: 'IBM Plex Sans', var(--font-body);
+  --font-number: 'Barlow', 'Noto Sans TC', system-ui, sans-serif;
 
-  --radius-lg: 16px;
-  --radius-md: 10px;
-  --radius-sm: 6px;
-  --sidebar-width: 224px;
+  --radius-lg: 8px;
+  --radius-md: 6px;
+  --radius-sm: 4px;
 
   font-family: var(--font-body);
   color: var(--color-text);
