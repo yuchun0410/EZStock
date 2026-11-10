@@ -3,6 +3,7 @@ package com.ezstock.config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -31,8 +32,12 @@ public class RedisStartupCheck {
             String reply = connection.ping();
             log.info("[Redis] 連線成功（ping 回應 {}，{} ms）", reply, System.currentTimeMillis() - started);
         } catch (Exception e) {
-            log.warn("[Redis] 連線失敗，會員登入功能將無法使用：{}（本機請執行 brew services start redis）",
-                    e.getMessage());
+            // 外層的訊息通常只有「Unable to connect to Redis」，看不出原因；
+            // 往下找最根本的例外（例如密碼錯、沒開 TLS 被斷線、主機名稱查不到），一起印出來
+            Throwable root = NestedExceptionUtils.getMostSpecificCause(e);
+            log.warn("[Redis] 連線失敗，會員登入功能將無法使用：{}（根本原因：{}: {}）。"
+                            + "本機請確認 brew services start redis；正式環境請檢查 REDIS_URL（密碼、rediss://）",
+                    e.getMessage(), root.getClass().getSimpleName(), root.getMessage());
         }
     }
 }
