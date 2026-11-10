@@ -5,6 +5,7 @@ import com.ezstock.dto.LoginRequest;
 import com.ezstock.dto.MemberResponse;
 import com.ezstock.dto.RegisterRequest;
 import com.ezstock.security.AccessToken;
+import com.ezstock.security.LineLoginUser;
 
 public interface AuthService {
 
@@ -20,6 +21,12 @@ public interface AuthService {
      * @param credential 前端 Google 按鈕拿到的 ID Token
      */
     AuthResult loginWithGoogle(String credential);
+
+    /**
+     * LINE 登入（LINE 那邊已經驗證過使用者）：用 LINE 使用者 id 找會員，找不到就建立新會員。
+     * 不會用 Email 自動綁定既有帳號，見實作的說明。
+     */
+    AuthResult loginWithLine(LineLoginUser lineUser);
 
     /** 有開放哪些登入方式 */
     AuthProvidersResponse providers();

@@ -151,7 +151,7 @@ class AuthControllerTest {
     }
 
     private AuthResult result() {
-        MemberResponse member = new MemberResponse(1L, "a@example.com", "小明", null, true, false,
+        MemberResponse member = new MemberResponse(1L, "a@example.com", "小明", null, true, false, false,
                 LocalDateTime.of(2026, 10, 29, 14, 0));
         return new AuthResult(new AccessToken("jwt-value", "jti", Instant.now().plusSeconds(900)),
                 "refresh-value", member);

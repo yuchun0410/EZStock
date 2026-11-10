@@ -106,10 +106,22 @@ public class AuthController {
     }
 
     private ResponseEntity<TokenResponse> withTokens(HttpStatus status, AuthResult result) {
+        return tokenResponse(status, result, cookies);
+    }
+
+    /**
+     * 登入成功的回應：access token 放 body，refresh token 放 HttpOnly cookie。
+     * LINE 登入的 Controller 也用這個，extraCookies 是另外要一起設定的 cookie（例如清掉 LINE 登入用的 state）。
+     */
+    static ResponseEntity<TokenResponse> tokenResponse(HttpStatus status, AuthResult result, RefreshTokenCookies cookies,
+                                                       String... extraCookies) {
         long expiresIn = Math.max(0, Duration.between(Instant.now(), result.accessToken().expiresAt()).toSeconds());
         TokenResponse body = new TokenResponse(result.accessToken().value(), "Bearer", expiresIn, result.member());
-        return ResponseEntity.status(status)
-                .header(HttpHeaders.SET_COOKIE, cookies.create(result.refreshToken()).toString())
-                .body(body);
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(status)
+                .header(HttpHeaders.SET_COOKIE, cookies.create(result.refreshToken()).toString());
+        for (String cookie : extraCookies) {
+            builder.header(HttpHeaders.SET_COOKIE, cookie);
+        }
+        return builder.body(body);
     }
 }

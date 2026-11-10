@@ -14,6 +14,8 @@ import com.ezstock.security.AccessToken;
 import com.ezstock.security.AccessTokenBlacklist;
 import com.ezstock.security.GoogleIdTokenVerifier;
 import com.ezstock.security.GoogleUser;
+import com.ezstock.security.LineLoginProperties;
+import com.ezstock.security.LineLoginUser;
 import com.ezstock.security.LogMasks;
 import com.ezstock.security.LoginAttemptLimiter;
 import com.ezstock.security.RefreshTokenStore;
@@ -53,6 +55,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtDecoder jwtDecoder;
     private final GoogleIdTokenVerifier googleVerifier;
     private final LoginAttemptLimiter loginLimiter;
+    private final LineLoginProperties lineLoginProperties;
     private final Clock clock;
 
     /** Email 不存在時也跑一次 BCrypt，讓回應時間跟「密碼錯」差不多，避免用時間差猜出帳號存不存在 */
@@ -61,7 +64,7 @@ public class AuthServiceImpl implements AuthService {
     public AuthServiceImpl(MemberDao memberDao, PasswordEncoder passwordEncoder, TokenService tokenService,
                            RefreshTokenStore refreshTokenStore, AccessTokenBlacklist blacklist,
                            JwtDecoder jwtDecoder, GoogleIdTokenVerifier googleVerifier,
-                           LoginAttemptLimiter loginLimiter, Clock clock) {
+                           LoginAttemptLimiter loginLimiter, LineLoginProperties lineLoginProperties, Clock clock) {
         this.memberDao = memberDao;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
@@ -70,6 +73,7 @@ public class AuthServiceImpl implements AuthService {
         this.jwtDecoder = jwtDecoder;
         this.googleVerifier = googleVerifier;
         this.loginLimiter = loginLimiter;
+        this.lineLoginProperties = lineLoginProperties;
         this.clock = clock;
         this.dummyHash = passwordEncoder.encode("dummy-password-for-timing");
     }
@@ -178,9 +182,50 @@ public class AuthServiceImpl implements AuthService {
         return issueTokens(member);
     }
 
+    /**
+     * LINE 登入。
+     * 為什麼不像 Google 一樣，用 Email 自動綁定既有帳號：LINE 不保證 Email 有驗證過，我們的註冊目前也沒有驗證 Email，
+     * 如果有人先用別人的 Email 註冊、或 LINE 帳號填了別人的 Email，自動綁定就等於讓他登入別人的帳號。
+     * 所以 Email 已經被註冊時回 409，請使用者先用原本的方式登入，在「我的資產」用綁定碼綁 LINE，之後就能用 LINE 登入
+     * （LINE Login 和 LINE Bot 在同一個 provider 底下，兩邊的使用者 id 一樣）。
+     */
+    @Override
+    public AuthResult loginWithLine(LineLoginUser lineUser) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        Member member = memberDao.findByLineUserId(lineUser.userId()).orElse(null);
+        if (member != null) {
+            log.info("[會員] LINE 登入 id={}", member.getId());
+        } else {
+            String email = Member.normalizeEmail(lineUser.email());
+            if (email != null && memberDao.findByEmail(email).isPresent()) {
+                log.info("[會員] LINE 登入失敗：{} 已經註冊過，請先用原本方式登入再綁定 LINE", LogMasks.email(email));
+                throw new ConflictException("這個 Email 已經註冊過。請先用原本的方式登入，到「我的資產」綁定 LINE，之後就能用 LINE 登入");
+            }
+            member = Member.withLine(lineUser.userId(), email, lineDisplayNameOf(lineUser), lineUser.pictureUrl(), now);
+            log.info("[會員] 第一次用 LINE 登入，建立新會員 LINE 使用者 {}", LogMasks.lineUserId(lineUser.userId()));
+        }
+
+        member.recordLogin(now);
+        try {
+            memberDao.save(member);
+        } catch (DataIntegrityViolationException e) {
+            // 同一個 LINE 帳號同時送兩次登入，第二個會撞到唯一索引
+            log.info("[會員] LINE 登入失敗：同時有另一個登入請求");
+            throw new ConflictException("登入處理中，請再試一次");
+        }
+        log.info("[會員] LINE 登入成功 id={}", member.getId());
+        return issueTokens(member);
+    }
+
+    private static String lineDisplayNameOf(LineLoginUser lineUser) {
+        String name = lineUser.name() == null || lineUser.name().isBlank() ? "LINE 使用者" : lineUser.name().trim();
+        return name.length() > DISPLAY_NAME_MAX ? name.substring(0, DISPLAY_NAME_MAX) : name;
+    }
+
     @Override
     public AuthProvidersResponse providers() {
-        return new AuthProvidersResponse(googleVerifier.enabled() ? googleVerifier.clientId() : null);
+        return new AuthProvidersResponse(googleVerifier.enabled() ? googleVerifier.clientId() : null,
+                lineLoginProperties.enabled());
     }
 
     /** Google 沒給名稱就用 Email @ 前面那段，太長就截斷 */

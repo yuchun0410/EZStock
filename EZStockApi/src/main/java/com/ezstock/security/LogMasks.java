@@ -19,4 +19,12 @@ public final class LogMasks {
         }
         return email.charAt(0) + "*".repeat(Math.max(at - 1, 1)) + email.substring(at);
     }
+
+    /** LINE 使用者 id 只留最後 6 碼，看得出是不是同一個人，但不會洩漏完整 id */
+    public static String lineUserId(String userId) {
+        if (userId == null || userId.length() <= 6) {
+            return "…";
+        }
+        return "…" + userId.substring(userId.length() - 6);
+    }
 }
