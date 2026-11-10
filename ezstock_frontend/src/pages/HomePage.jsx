@@ -4,6 +4,7 @@ import NewsList from '../components/NewsList'
 import WatchlistCard from '../components/WatchlistCard'
 import { useStockSearch } from '../hooks/useStockSearch'
 import { useWatchlist } from '../hooks/useWatchlist'
+import { isUsStock } from '../utils/format'
 
 const POPULAR_STOCKS = [
   { stockId: '2330', name: '台積電' },
@@ -16,9 +17,20 @@ const POPULAR_STOCKS = [
   { stockId: '00878', name: '國泰永續高股息' },
 ]
 
+const POPULAR_US_STOCKS = [
+  { stockId: 'AAPL', name: 'Apple' },
+  { stockId: 'NVDA', name: 'NVIDIA' },
+  { stockId: 'MSFT', name: 'Microsoft' },
+  { stockId: 'TSLA', name: 'Tesla' },
+  { stockId: 'TSM', name: '台積電 ADR' },
+  { stockId: 'SPY', name: 'S&P 500 ETF' },
+  { stockId: 'QQQ', name: 'Nasdaq 100 ETF' },
+  { stockId: 'VT', name: '全世界股票 ETF' },
+]
+
 const TYPE_LABELS = { STOCK: '股票', ETF: 'ETF' }
 
-// 後端一次最多查 20 檔新聞：自選股優先，剩下的名額給熱門股
+// 後端一次最多查 20 檔新聞：自選股優先，剩下的名額給熱門股（新聞只有台股）
 const MAX_NEWS_STOCKS = 20
 
 /** 首頁：輸入代號或名稱搜尋股票 */
@@ -36,13 +48,16 @@ function HomePage() {
   const newsReady = !watchlist.authChecking && !watchlist.loading
   const newsStockIds = [
     ...new Set([...watchlist.items.map((item) => item.stockId), ...POPULAR_STOCKS.map((stock) => stock.stockId)]),
-  ].slice(0, MAX_NEWS_STOCKS)
+  ]
+    .filter((stockId) => !isUsStock(stockId))
+    .slice(0, MAX_NEWS_STOCKS)
 
   // 按 Enter：代號完全相符或只有一筆結果，就直接進個股頁
   function handleSubmit(event) {
     event.preventDefault()
     if (!isCurrent) return
-    const exact = stocks.find((stock) => stock.stockId === keyword)
+    // 美股代號不分大小寫：輸入 aapl 也算 AAPL
+    const exact = stocks.find((stock) => stock.stockId.toUpperCase() === keyword.toUpperCase())
     const target = exact ?? (stocks.length === 1 ? stocks[0] : null)
     if (target) {
       navigate(`/stocks/${target.stockId}`)
@@ -60,7 +75,7 @@ function HomePage() {
             id="search"
             className="search-input"
             type="search"
-            placeholder="輸入代號或名稱，例如 2330、台積"
+            placeholder="輸入代號或名稱，例如 2330、台積、AAPL"
             value={input}
             onChange={(event) => {
               setInput(event.target.value)
@@ -85,6 +100,7 @@ function HomePage() {
                   <span className="search-result-id">{stock.stockId}</span>
                   <span className="search-result-name">{stock.name}</span>
                   <span className="muted">
+                    {stock.market === 'US' && <span className="market-badge market-us">美股</span>}
                     {TYPE_LABELS[stock.type] ?? stock.type}
                     {stock.industry && ` · ${stock.industry}`}
                   </span>
@@ -108,6 +124,14 @@ function HomePage() {
               <h2 className="section-title">熱門個股</h2>
               <div className="chips">
                 {POPULAR_STOCKS.map((stock) => (
+                  <Link key={stock.stockId} to={`/stocks/${stock.stockId}`} className="chip">
+                    {stock.stockId} {stock.name}
+                  </Link>
+                ))}
+              </div>
+              <h3 className="popular-subtitle muted">美股</h3>
+              <div className="chips">
+                {POPULAR_US_STOCKS.map((stock) => (
                   <Link key={stock.stockId} to={`/stocks/${stock.stockId}`} className="chip">
                     {stock.stockId} {stock.name}
                   </Link>

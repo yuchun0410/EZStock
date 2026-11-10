@@ -2,6 +2,7 @@ package com.ezstock.repository;
 
 import com.ezstock.model.DailyPrice;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -35,4 +36,10 @@ public interface DailyPriceRepository extends JpaRepository<DailyPrice, Long> {
     List<LocalDate> findTradeDates(@Param("stockId") String stockId,
                                    @Param("from") LocalDate from,
                                    @Param("to") LocalDate to);
+
+    // 刪除某檔股票的全部日線（美股還原價改變時整段重抓用）。
+    // 用一句 DELETE，不要先查出來再一筆一筆刪
+    @Modifying
+    @Query("DELETE FROM DailyPrice p WHERE p.stock.stockId = :stockId")
+    int deleteByStockId(@Param("stockId") String stockId);
 }

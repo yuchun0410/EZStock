@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getPrices } from '../api/stockApi'
 import { toChartPoints, toWeekly, withMovingAverages } from '../utils/chartData'
-import { formatSigned, minusMonths, trendClass } from '../utils/format'
+import { formatSigned, isUsStock, minusMonths, trendClass } from '../utils/format'
 import { MOVING_AVERAGES } from './chartConfig'
 import PriceChart from './PriceChart'
 import VolumeChart from './VolumeChart'
@@ -104,8 +104,9 @@ function PriceSection({ stockId, latestDate }) {
             longRange={range.months >= 12}
             weekly={weekly}
             maPeriods={maPeriods}
+            stockId={stockId}
           />
-          <VolumeChart points={points} />
+          <VolumeChart points={points} us={isUsStock(stockId)} />
           {weekly && <p className="chart-caption muted">5 年期間的 K 線以週 K 顯示，均線也改用週線計算</p>}
         </>
       )}

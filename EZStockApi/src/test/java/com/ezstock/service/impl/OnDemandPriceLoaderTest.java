@@ -3,6 +3,7 @@ package com.ezstock.service.impl;
 import com.ezstock.dao.DailyPriceDao;
 import com.ezstock.datasource.finmind.FinMindApiException;
 import com.ezstock.model.DailyPrice;
+import com.ezstock.model.Market;
 import com.ezstock.model.Stock;
 import com.ezstock.model.StockType;
 import com.ezstock.service.ImportService;
@@ -89,6 +90,21 @@ class OnDemandPriceLoaderTest {
         Clock sunday = Clock.fixed(Instant.parse("2026-11-01T06:00:00Z"), TAIPEI);
         assertThat(new OnDemandPriceLoader(dailyPriceDao, importService, sunday)
                 .expectedLatestTradingDay()).isEqualTo(LocalDate.of(2026, 10, 30));
+    }
+
+    @Test
+    @DisplayName("美股應該要有的最新交易日：台灣時間 08:00 後是前一天，之前是前兩天；週一早上是上週五")
+    void expectedLatestUsTradingDay() {
+        // 週三 10:00 → 美國週二的資料應該出來了
+        assertThat(loader.expectedLatestTradingDay(Market.US)).isEqualTo(LocalDate.of(2026, 10, 27));
+
+        Clock wednesdayDawn = Clock.fixed(Instant.parse("2026-10-27T22:00:00Z"), TAIPEI);    // 週三 06:00
+        assertThat(new OnDemandPriceLoader(dailyPriceDao, importService, wednesdayDawn)
+                .expectedLatestTradingDay(Market.US)).isEqualTo(LocalDate.of(2026, 10, 26));
+
+        Clock mondayMorning = Clock.fixed(Instant.parse("2026-11-02T02:00:00Z"), TAIPEI);    // 週一 10:00
+        assertThat(new OnDemandPriceLoader(dailyPriceDao, importService, mondayMorning)
+                .expectedLatestTradingDay(Market.US)).isEqualTo(LocalDate.of(2026, 10, 30));
     }
 
     @Test

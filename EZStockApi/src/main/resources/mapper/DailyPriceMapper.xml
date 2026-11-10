@@ -69,4 +69,8 @@
              #{p.lowPrice}, #{p.closePrice}, #{p.volume})
         </foreach>
     </insert>
+
+    <delete id="deleteByStock">
+        DELETE FROM daily_price WHERE stock_id = #{stockId}
+    </delete>
 </mapper>

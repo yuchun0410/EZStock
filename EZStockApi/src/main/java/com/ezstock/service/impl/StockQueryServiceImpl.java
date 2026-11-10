@@ -72,7 +72,8 @@ public class StockQueryServiceImpl implements StockQueryService {
         Optional<DailyPrice> latest = dailyPriceDao.findLatest(stockId);
         if (latest.isEmpty()) {
             log.info("查詢個股 {} {}：尚無價格資料", stockId, stock.getName());
-            return new StockDetail(stock.getStockId(), stock.getName(), stock.getType(), stock.getIndustry(),
+            return new StockDetail(stock.getStockId(), stock.getName(), stock.getType(), stock.getMarket(),
+                    stock.getMarket().currency(), stock.getIndustry(),
                     null, null, null, null);
         }
 
@@ -92,7 +93,8 @@ public class StockQueryServiceImpl implements StockQueryService {
 
         log.info("查詢個股 {} {}：{} 收盤 {}，漲跌 {}（{}%）", stockId, stock.getName(),
                 today.getTradeDate(), today.getClosePrice(), change, changePercent);
-        return new StockDetail(stock.getStockId(), stock.getName(), stock.getType(), stock.getIndustry(),
+        return new StockDetail(stock.getStockId(), stock.getName(), stock.getType(), stock.getMarket(),
+                stock.getMarket().currency(), stock.getIndustry(),
                 today.getTradeDate(), today.getClosePrice(), change, changePercent);
     }
 

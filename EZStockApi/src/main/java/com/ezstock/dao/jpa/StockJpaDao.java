@@ -40,7 +40,7 @@ public class StockJpaDao implements StockDao {
     public List<Stock> search(String keyword, int limit) {
         log.debug("[JPA] 搜尋股票 keyword={} limit={}", keyword, limit);
         List<Stock> result = stockRepository
-                .findByStockIdContainingOrNameContainingOrderByStockIdAsc(keyword, keyword, Limit.of(limit));
+                .search(keyword, Limit.of(limit));
         log.debug("[JPA] 搜尋股票 keyword={} 共 {} 筆", keyword, result.size());
         return result;
     }
@@ -68,6 +68,6 @@ public class StockJpaDao implements StockDao {
     public void save(Stock stock) {
         log.debug("[JPA] 儲存股票 stockId={} name={}", stock.getStockId(), stock.getName());
         stockRepository.save(stock);
-        log.info("[JPA] 已儲存股票 {} {}", stock.getStockId(), stock.getName());
+        log.debug("[JPA] 已儲存股票 {} {}", stock.getStockId(), stock.getName());
     }
 }

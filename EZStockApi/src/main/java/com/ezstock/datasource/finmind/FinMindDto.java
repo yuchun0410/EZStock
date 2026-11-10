@@ -77,4 +77,27 @@ final class FinMindDto {
             @JsonProperty("before_close") BigDecimal beforeClose,
             @JsonProperty("after_ref_close") BigDecimal afterRefClose) {
     }
+
+    /** USStockInfo（美股清單；同一檔會有好幾個日期的快照，最新日期的才是目前掛牌的） */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record UsStockInfoRow(
+            @JsonProperty("date") String date,
+            @JsonProperty("stock_id") String stockId,
+            @JsonProperty("stock_name") String stockName,
+            @JsonProperty("Subsector") String subsector,
+            @JsonProperty("MarketCap") BigDecimal marketCap) {
+    }
+
+    /** USStockPrice（Close 已還原分割；Adj_Close 再還原股利） */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record UsPriceRow(
+            @JsonProperty("date") String date,
+            @JsonProperty("stock_id") String stockId,
+            @JsonProperty("Open") BigDecimal open,
+            @JsonProperty("High") BigDecimal high,
+            @JsonProperty("Low") BigDecimal low,
+            @JsonProperty("Close") BigDecimal close,
+            @JsonProperty("Adj_Close") BigDecimal adjClose,
+            @JsonProperty("Volume") BigDecimal volume) {
+    }
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { Line, LineChart, ResponsiveContainer, Tooltip, YAxis } from 'recharts'
 import { getPrices } from '../api/stockApi'
-import { formatPrice, formatSigned, minusMonths, toIsoDate, trendClass } from '../utils/format'
+import { currencyPrefix, formatPrice, formatSigned, minusMonths, toIsoDate, trendClass } from '../utils/format'
 import { CHART_COLORS } from './chartConfig'
 
 /**
@@ -41,7 +41,7 @@ function StockSparkline({ stock }) {
         <Link to={`/stocks/${stock.stockId}`}>
           {stock.stockId} {stock.name}
         </Link>
-        {last != null && <strong>{formatPrice(last)}</strong>}
+        {last != null && <strong>{currencyPrefix(stock.stockId) + formatPrice(last)}</strong>}
       </div>
       {state.status === 'loading' && <div className="sparkline-placeholder muted">載入中…</div>}
       {state.status === 'error' && <div className="sparkline-placeholder muted">走勢圖暫時無法顯示</div>}

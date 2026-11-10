@@ -27,4 +27,6 @@ public interface DailyPriceMapper {
                                        @Param("from") LocalDate from);
 
     int insertBatch(@Param("prices") List<DailyPrice> prices);
+
+    int deleteByStock(@Param("stockId") String stockId);
 }

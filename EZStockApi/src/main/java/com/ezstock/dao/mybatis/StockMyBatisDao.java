@@ -65,6 +65,6 @@ public class StockMyBatisDao implements StockDao {
     public void save(Stock stock) {
         log.debug("[MyBatis] 儲存股票 stockId={} name={}", stock.getStockId(), stock.getName());
         stockMapper.upsert(stock);
-        log.info("[MyBatis] 已儲存股票 {} {}", stock.getStockId(), stock.getName());
+        log.debug("[MyBatis] 已儲存股票 {} {}", stock.getStockId(), stock.getName());
     }
 }

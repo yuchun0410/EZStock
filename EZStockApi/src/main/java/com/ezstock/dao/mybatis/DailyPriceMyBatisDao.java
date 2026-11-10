@@ -90,4 +90,12 @@ public class DailyPriceMyBatisDao implements DailyPriceDao {
         log.info("[MyBatis] 批次新增日線 完成，共 {} 筆", inserted);
         return inserted;
     }
+
+    @Override
+    @Transactional
+    public int deleteByStock(String stockId) {
+        int deleted = dailyPriceMapper.deleteByStock(stockId);
+        log.info("[MyBatis] 刪除 {} 的日線 共 {} 筆", stockId, deleted);
+        return deleted;
+    }
 }

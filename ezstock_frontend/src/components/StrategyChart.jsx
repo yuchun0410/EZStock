@@ -8,7 +8,7 @@ const SERIES = [
 ]
 
 /** 條件策略 vs 一直持有的資產曲線（兩條線，同一個 Y 軸） */
-function StrategyChart({ strategyCurve, benchmarkCurve, initialCapital }) {
+function StrategyChart({ strategyCurve, benchmarkCurve, initialCapital, unit = '元' }) {
   const data = merge(strategyCurve, benchmarkCurve)
 
   return (
@@ -33,7 +33,7 @@ function StrategyChart({ strategyCurve, benchmarkCurve, initialCapital }) {
             domain={['auto', 'auto']}
           />
           <Tooltip
-            content={<StrategyTooltip initialCapital={initialCapital} />}
+            content={<StrategyTooltip initialCapital={initialCapital} unit={unit} />}
             cursor={{ stroke: CHART_COLORS.axis, strokeDasharray: '4 4' }}
             isAnimationActive={false}
           />
@@ -60,7 +60,7 @@ function StrategyChart({ strategyCurve, benchmarkCurve, initialCapital }) {
   )
 }
 
-function StrategyTooltip({ active, payload, label, initialCapital }) {
+function StrategyTooltip({ active, payload, label, initialCapital, unit }) {
   if (!active || !payload?.length) return null
   return (
     <div className="chart-tooltip">
@@ -71,7 +71,7 @@ function StrategyTooltip({ active, payload, label, initialCapital }) {
         return (
           <div key={p.dataKey} className="chart-tooltip-ma">
             <span className="legend-dot" style={{ background: series?.color }} />
-            {series?.label}：{formatMoney(p.value)} 元（{percent >= 0 ? '+' : ''}
+            {series?.label}：{formatMoney(p.value)} {unit}（{percent >= 0 ? '+' : ''}
             {percent.toFixed(1)}%）
           </div>
         )

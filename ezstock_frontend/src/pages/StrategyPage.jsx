@@ -8,7 +8,7 @@ import StrategyChart from '../components/StrategyChart'
 import StrategySummary from '../components/StrategySummary'
 import TradeTable from '../components/TradeTable'
 import { isValidDiscount, toDiscountRatio } from '../utils/fee'
-import { formatMoney, formatSigned, minusMonths, toIsoDate, trendClass } from '../utils/format'
+import { formatMoney, formatSigned, isUsStock, minusMonths, moneyUnit, toIsoDate, trendClass } from '../utils/format'
 
 const MAX_RULES = 3
 
@@ -102,6 +102,8 @@ function StrategyPage() {
     }
   }, [])
 
+  // 美股用還原股價（股利已經算在裡面），也沒有台股的手續費折扣
+  const us = stocks.length === 1 && isUsStock(stocks[0].stockId)
   const entryTypes = types.list.filter((t) => t.entryAllowed)
   const rulesFilled = (rules) => rules.length > 0 && rules.every((r) => r.value !== '')
   const canSubmit =
@@ -110,7 +112,7 @@ function StrategyPage() {
     Number(capital) >= 1000 &&
     rulesFilled(entry) &&
     rulesFilled(exit) &&
-    isValidDiscount(includeCosts, feeDiscount) &&
+    (us || isValidDiscount(includeCosts, feeDiscount)) &&
     types.list.length > 0 &&
     state.status !== 'loading'
 
@@ -130,9 +132,9 @@ function StrategyPage() {
       initialCapital: Number(capital),
       entryConditions: toSpecs(entry),
       exitConditions: toSpecs(exit),
-      reinvestDividends: reinvest,
+      reinvestDividends: us ? true : reinvest,
       includeCosts,
-      feeDiscount: toDiscountRatio(includeCosts, feeDiscount),
+      feeDiscount: us ? null : toDiscountRatio(includeCosts, feeDiscount),
     }
     console.info('[條件回測] 送出', request)
     setState((current) => ({ ...current, status: 'loading', error: null }))
@@ -184,7 +186,7 @@ function StrategyPage() {
               />
             </label>
             <label className="form-field">
-              <span className="form-label">投入金額（元）</span>
+              <span className="form-label">投入金額（{us ? '美元' : '元'}）</span>
               <input
                 type="number"
                 className="form-input"
@@ -230,18 +232,24 @@ function StrategyPage() {
             </div>
           )}
 
-          <div className="form-row">
-            <label className="form-check">
-              <input type="checkbox" checked={reinvest} onChange={(event) => setReinvest(event.target.checked)} />
-              股利再投入（條件策略與一直持有都適用）
-            </label>
-            <FeeSettings
-              includeCosts={includeCosts}
-              onIncludeCostsChange={setIncludeCosts}
-              feeDiscount={feeDiscount}
-              onFeeDiscountChange={setFeeDiscount}
-            />
-          </div>
+          {us ? (
+            <p className="muted form-hint">
+              美股使用還原股價，持有期間的股利已經自動再投入；交易成本以美國券商零手續費計算。
+            </p>
+          ) : (
+            <div className="form-row">
+              <label className="form-check">
+                <input type="checkbox" checked={reinvest} onChange={(event) => setReinvest(event.target.checked)} />
+                股利再投入（條件策略與一直持有都適用）
+              </label>
+              <FeeSettings
+                includeCosts={includeCosts}
+                onIncludeCostsChange={setIncludeCosts}
+                feeDiscount={feeDiscount}
+                onFeeDiscountChange={setFeeDiscount}
+              />
+            </div>
+          )}
 
           <button type="submit" className="primary-button" disabled={!canSubmit}>
             {state.status === 'loading' ? '計算中…' : '開始回測'}
@@ -260,7 +268,7 @@ function StrategyPage() {
         <section className={`card compare-result ${state.status === 'loading' ? 'is-stale' : ''}`}>
           <h2 className="section-title">
             {response.stockId} {response.name}｜{response.startDate} ～ {response.endDate}，投入{' '}
-            {formatMoney(response.initialCapital)} 元
+            {formatMoney(response.initialCapital)} {moneyUnit(response.currency)}
           </h2>
           <p className="strategy-rules">
             <span>
@@ -273,7 +281,7 @@ function StrategyPage() {
             </span>
             <span>
               <strong>股利：</strong>
-              {response.reinvestDividends ? '再投入' : '領現金'}
+              {response.currency === 'USD' ? '已含在還原股價' : response.reinvestDividends ? '再投入' : '領現金'}
             </span>
           </p>
           <p className="strategy-verdict">
@@ -297,8 +305,13 @@ function StrategyPage() {
             strategyCurve={response.strategy.equityCurve}
             benchmarkCurve={response.benchmark.equityCurve}
             initialCapital={Number(response.initialCapital)}
+            unit={moneyUnit(response.currency)}
           />
-          <StrategySummary strategy={response.strategy} benchmark={response.benchmark} />
+          <StrategySummary
+            strategy={response.strategy}
+            benchmark={response.benchmark}
+            unit={moneyUnit(response.currency)}
+          />
 
           <h3 className="section-title trades-title">交易明細</h3>
           <TradeTable trades={response.strategy.trades} />

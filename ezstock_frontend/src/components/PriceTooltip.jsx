@@ -1,8 +1,8 @@
-import { formatLots, formatPrice } from '../utils/format'
+import { formatPrice, formatVolume } from '../utils/format'
 import { MOVING_AVERAGES } from './chartConfig'
 
 /** 滑鼠移到某一天（或某一週）時顯示的資訊框 */
-function PriceTooltip({ active, payload, weekly, maPeriods = [] }) {
+function PriceTooltip({ active, payload, weekly, maPeriods = [], stockId }) {
   if (!active || !payload?.length) return null
   const p = payload[0].payload
   return (
@@ -15,7 +15,7 @@ function PriceTooltip({ active, payload, weekly, maPeriods = [] }) {
         {/* 用全形空白（\u3000）分隔比較好讀。直接打全形空白，ESLint 會當成不正常的空白字元 */}
         {`開 ${formatPrice(p.open)}\u3000高 ${formatPrice(p.high)}\u3000低 ${formatPrice(p.low)}`}
       </div>
-      <div className="muted">成交量 {formatLots(p.volume)} 張</div>
+      <div className="muted">成交量 {formatVolume(p.volume, stockId)}</div>
       {MOVING_AVERAGES.filter((ma) => maPeriods.includes(ma.period) && p[`ma${ma.period}`] != null).map((ma) => (
         <div key={ma.period} className="chart-tooltip-ma">
           <span className="legend-swatch" style={{ background: ma.color }} />

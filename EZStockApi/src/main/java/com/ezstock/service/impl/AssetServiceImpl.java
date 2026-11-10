@@ -128,6 +128,11 @@ public class AssetServiceImpl implements AssetService {
     public AssetSummaryResponse saveHolding(long memberId, String stockId, HoldingRequest request) {
         String id = stockId.trim().toUpperCase();
         Stock stock = stockDao.findById(id).orElseThrow(() -> new ResourceNotFoundException("查無股票 " + id));
+        if (stock.isUs()) {
+            // 資產是用台幣加總，美股要先換算匯率才能算進淨資產，下一階段再開放
+            log.info("[資產] 會員 id={} 想新增美股持股 {}，目前還不支援", memberId, id);
+            throw new BadRequestException("目前持股只支援台股，美股（需要換算匯率）之後會開放");
+        }
         List<StockHolding> current = stockHoldingDao.findByMember(memberId);
         boolean exists = current.stream().anyMatch(h -> h.getId().getStockId().equals(id));
         if (!exists && current.size() >= MAX_HOLDINGS) {

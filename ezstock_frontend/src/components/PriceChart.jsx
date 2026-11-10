@@ -17,7 +17,7 @@ import PriceTooltip from './PriceTooltip'
  * 價格走勢圖：mode = 'line' 畫收盤價折線，mode = 'candle' 畫 K 線。
  * 折線的顏色跟著「這段期間」的漲跌：期間上漲紅色、下跌綠色。
  */
-function PriceChart({ points, mode, trend, longRange, weekly, maPeriods }) {
+function PriceChart({ points, mode, trend, longRange, weekly, maPeriods, stockId }) {
   const lineColor = CHART_COLORS[trend] ?? CHART_COLORS.neutral
   // 每種顏色一個漸層 id；同一頁只有一張價格圖，不會撞名
   const gradientId = `price-fill-${trend || 'flat'}`
@@ -56,7 +56,7 @@ function PriceChart({ points, mode, trend, longRange, weekly, maPeriods }) {
             axisLine={false}
           />
           <Tooltip
-            content={<PriceTooltip weekly={weekly} maPeriods={maPeriods} />}
+            content={<PriceTooltip weekly={weekly} maPeriods={maPeriods} stockId={stockId} />}
             cursor={{ stroke: CHART_COLORS.axis, strokeDasharray: '4 4' }}
             isAnimationActive={false}
           />

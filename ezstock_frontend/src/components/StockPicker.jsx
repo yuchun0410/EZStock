@@ -81,6 +81,7 @@ function StockPicker({ selected, onChange, max }) {
                 <button type="button" className="picker-suggestion" onClick={() => add(stock)}>
                   <span className="search-result-id">{stock.stockId}</span>
                   <span>{stock.name}</span>
+                  {stock.market === 'US' && <span className="market-badge market-us">美股</span>}
                 </button>
               </li>
             ))}
@@ -103,7 +104,7 @@ function StockPicker({ selected, onChange, max }) {
 }
 
 function placeholder(isFull, max) {
-  if (!isFull) return max === 1 ? '搜尋代號或名稱，例如 0050、台積' : '搜尋代號或名稱加入比較，例如 0050、台積'
+  if (!isFull) return max === 1 ? '搜尋代號或名稱，例如 0050、台積、AAPL' : '搜尋代號或名稱加入比較，例如 0050、台積、SPY'
   return max === 1 ? '要換股票，請先按上面的 ✕ 移除' : `最多比較 ${max} 檔`
 }
 

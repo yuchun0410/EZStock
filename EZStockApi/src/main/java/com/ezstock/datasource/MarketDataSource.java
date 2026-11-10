@@ -9,11 +9,20 @@ import java.util.List;
  */
 public interface MarketDataSource {
 
-    /** 股票清單（代號、名稱、類型、產業） */
+    /** 台股清單（代號、名稱、類型、產業） */
     List<StockInfo> fetchStockInfos();
 
-    /** 某檔股票某段期間的日線 */
+    /** 某檔台股某段期間的日線（原始價格，除權息另外用股利、分割資料處理） */
     List<PriceBar> fetchPrices(String stockId, LocalDate from, LocalDate to);
+
+    /** 美股清單：只挑一般人會查的（市值夠大的公司 + ETF），排除特別股、權證、SPAC 單位 */
+    List<StockInfo> fetchUsStockInfos();
+
+    /**
+     * 某檔美股某段期間的日線，已還原股利與分割（還原價）。
+     * 外部資料來源沒有美股的股利、分割資料，所以美股的回測直接用還原價，等於股利再投入。
+     */
+    List<PriceBar> fetchUsPrices(String stockId, LocalDate from, LocalDate to);
 
     /** 某檔股票某段期間的現金股利 */
     List<CashDividend> fetchCashDividends(String stockId, LocalDate from, LocalDate to);

@@ -44,7 +44,7 @@ public class LineCommandHandler {
 
     static final String HELP = """
             EZStock 小幫手可以做這些事：
-            ・傳股票代號或名稱查股價，例如：2330、台積電
+            ・傳股票代號或名稱查股價，例如：2330、台積電、AAPL
             ・傳「資產」查淨資產（要先綁定帳號）
             ・傳「回報」看今天的每日回報（淨資產＋自選股站上月線）
             ・傳「綁定 123456」綁定網站帳號（綁定碼在網站「我的資產」頁產生）
@@ -222,7 +222,7 @@ public class LineCommandHandler {
         }
         DailyPrice latest = prices.get(prices.size() - 1);
         StringBuilder text = new StringBuilder(title)
-                .append("\n收盤 ").append(price(latest.getClosePrice()))
+                .append("\n收盤 ").append(stock.isUs() ? "US$" : "").append(price(latest.getClosePrice()))
                 .append("（").append(latest.getTradeDate().format(DATE)).append("）");
         if (prices.size() >= 2) {
             BigDecimal previous = prices.get(prices.size() - 2).getClosePrice();

@@ -2,6 +2,7 @@ package com.ezstock.service.impl;
 
 import com.ezstock.backtest.cost.CostModel;
 import com.ezstock.backtest.cost.TaiwanStockCostModel;
+import com.ezstock.backtest.cost.UsStockCostModel;
 import com.ezstock.backtest.cost.ZeroCostModel;
 import com.ezstock.dao.DailyPriceDao;
 import com.ezstock.dao.DividendDao;
@@ -10,6 +11,7 @@ import com.ezstock.dao.StockSplitDao;
 import com.ezstock.exception.BadRequestException;
 import com.ezstock.exception.ResourceNotFoundException;
 import com.ezstock.model.DailyPrice;
+import com.ezstock.model.Market;
 import com.ezstock.model.Dividend;
 import com.ezstock.model.Stock;
 import com.ezstock.model.StockSplit;
@@ -93,11 +95,24 @@ public class BacktestDataLoader {
         return new StockData(stock, prices, dividends, splits);
     }
 
-    /** 依使用者的選擇決定交易成本模型 */
+    /** 依使用者的選擇決定交易成本模型（台股） */
     public static CostModel costModel(Boolean includeCosts, BigDecimal feeDiscount) {
+        return costModel(Market.TW, includeCosts, feeDiscount);
+    }
+
+    /** 依市場和使用者的選擇決定交易成本模型；手續費折扣只對台股有意義 */
+    public static CostModel costModel(Market market, Boolean includeCosts, BigDecimal feeDiscount) {
         if (Boolean.FALSE.equals(includeCosts)) {
             return new ZeroCostModel();
         }
+        if (market == Market.US) {
+            return new UsStockCostModel();
+        }
         return new TaiwanStockCostModel(feeDiscount != null ? feeDiscount : BigDecimal.ONE);
     }
+
+    /** 美股的價格已經還原股利（等於股利自動再投入），說明要讓使用者知道 */
+    public static final String US_ADJUSTED_PRICE_NOTE =
+            "美股價格為還原股價（已反映股利與分割，等於股利再投入），所以「股利領現金」的選項對美股不適用，"
+                    + "也不另外列出股利金額；未計股利預扣稅（美股股利預扣 30%）";
 }

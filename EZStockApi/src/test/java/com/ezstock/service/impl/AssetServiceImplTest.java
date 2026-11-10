@@ -12,6 +12,7 @@ import com.ezstock.exception.BadRequestException;
 import com.ezstock.exception.ResourceNotFoundException;
 import com.ezstock.model.AccountKind;
 import com.ezstock.model.DailyPrice;
+import com.ezstock.model.Market;
 import com.ezstock.model.MoneyAccount;
 import com.ezstock.model.Stock;
 import com.ezstock.model.StockHolding;
@@ -178,6 +179,17 @@ class AssetServiceImplTest {
 
         assertThatThrownBy(() -> service.saveHolding(ME, "abc", new HoldingRequest(1L, BigDecimal.ONE)))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("持股：美股要換算匯率，這一版先不開放，回 400 而且不寫入")
+    void rejectUsHolding() {
+        when(stockDao.findById("AAPL")).thenReturn(Optional.of(
+                new Stock("AAPL", "Apple Inc.", StockType.STOCK, Market.US, null)));
+
+        assertThatThrownBy(() -> service.saveHolding(ME, "aapl", new HoldingRequest(10L, new BigDecimal("200"))))
+                .isInstanceOf(BadRequestException.class).hasMessageContaining("美股");
+        verify(stockHoldingDao, never()).upsert(any());
     }
 
     @Test

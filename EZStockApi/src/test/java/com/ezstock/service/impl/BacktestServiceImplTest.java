@@ -9,6 +9,7 @@ import com.ezstock.dto.CompareResponse;
 import com.ezstock.exception.BadRequestException;
 import com.ezstock.exception.ResourceNotFoundException;
 import com.ezstock.model.DailyPrice;
+import com.ezstock.model.Market;
 import com.ezstock.model.Stock;
 import com.ezstock.model.StockType;
 import com.ezstock.service.PriceLoader;
@@ -42,6 +43,7 @@ class BacktestServiceImplTest {
 
     private final Stock a = new Stock("AAAA", "甲股", StockType.STOCK, "測試");
     private final Stock b = new Stock("BBBB", "乙 ETF", StockType.ETF, "測試");
+    private final Stock us = new Stock("SPY", "SPDR S&P 500 ETF", StockType.ETF, Market.US, "ETF");
 
     private StockDao stockDao;
     private DailyPriceDao dailyPriceDao;
@@ -69,6 +71,9 @@ class BacktestServiceImplTest {
                 .thenReturn(List.of(price(a, START, "100"), price(a, START.plusDays(1), "120")));
         when(dailyPriceDao.findByStockAndDateRange("BBBB", START, TODAY))
                 .thenReturn(List.of(price(b, START, "50"), price(b, START.plusDays(1), "45")));
+        when(stockDao.findById("SPY")).thenReturn(Optional.of(us));
+        when(dailyPriceDao.findByStockAndDateRange("SPY", START, TODAY))
+                .thenReturn(List.of(price(us, START, "600"), price(us, START.plusDays(1), "606")));
         when(dividendDao.findByStockAndDateRange(anyString(), any(), any())).thenReturn(List.of());
         when(stockSplitDao.findByStockAndDateRange(anyString(), any(), any())).thenReturn(List.of());
     }
@@ -125,6 +130,24 @@ class BacktestServiceImplTest {
         assertThatThrownBy(() -> service.compare(request(List.of("9999"), null, false)))
                 .isInstanceOf(ResourceNotFoundException.class);
         verify(priceLoader, never()).ensureLoaded(anyString());
+    }
+
+    @Test
+    @DisplayName("美股：用美股的成本模型，金額單位是美元，假設裡說明是還原價")
+    void compareUsStock() {
+        CompareResponse response = service.compare(request(List.of("SPY"), null, null));
+
+        assertThat(response.currency()).isEqualTo("USD");
+        assertThat(response.costDescription()).contains("零手續費");
+        assertThat(response.results().getFirst().totalCosts()).isEqualByComparingTo("0");
+        assertThat(response.assumptions()).anyMatch(text -> text.contains("還原股價"));
+    }
+
+    @Test
+    @DisplayName("台股和美股混在一起比較，回 400")
+    void rejectMixedMarkets() {
+        assertThatThrownBy(() -> service.compare(request(List.of("AAAA", "SPY"), null, false)))
+                .isInstanceOf(BadRequestException.class).hasMessageContaining("分開比較");
     }
 
     @Test
