@@ -41,6 +41,15 @@ ezstock.line.bot-id=
 ezstock.line.report-enabled=true
 ezstock.line.report-cron=0 0 18 * * MON-FRI
 
+# ---------- LINE 登入（LINE Login channel，跟 LINE Bot 是不同的 channel）----------
+# LINE Developers → 跟 LINE Bot 同一個 Provider → 新增 LINE Login channel（Web app）
+# Channel secret 是密碼，不要寫在這裡！請在 IntelliJ 的 Run Configuration → Environment variables 設定：
+#   EZSTOCK_LINE_LOGIN_CHANNEL_SECRET=<LINE Login channel → Basic settings → Channel secret>
+# channel-id 空白代表不開放 LINE 登入（登入頁不會顯示 LINE 按鈕）
+ezstock.line-login.channel-id=
+# 要跟 LINE Login channel → LINE Login 分頁的 Callback URL 完全一樣
+ezstock.line-login.redirect-uri=http://localhost:5173/login/line/callback
+
 finmind.api.url=https://api.finmindtrade.com/api/v4/data
 finmind.api.token=YOUR_FINMIND_TOKEN
 

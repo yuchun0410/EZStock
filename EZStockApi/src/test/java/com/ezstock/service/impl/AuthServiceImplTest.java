@@ -12,6 +12,8 @@ import com.ezstock.security.AccessToken;
 import com.ezstock.security.AccessTokenBlacklist;
 import com.ezstock.security.GoogleIdTokenVerifier;
 import com.ezstock.security.GoogleUser;
+import com.ezstock.security.LineLoginProperties;
+import com.ezstock.security.LineLoginUser;
 import com.ezstock.security.LoginAttemptLimiter;
 import com.ezstock.security.RefreshTokenStore;
 import com.ezstock.security.TokenService;
@@ -75,7 +77,7 @@ class AuthServiceImplTest {
         loginLimiter = mock(LoginAttemptLimiter.class);
         Clock clock = Clock.fixed(NOW, ZoneId.of("Asia/Taipei"));
         service = new AuthServiceImpl(memberDao, encoder, tokenService, refreshTokenStore, blacklist, jwtDecoder,
-                googleVerifier, loginLimiter, clock);
+                googleVerifier, loginLimiter, new LineLoginProperties("channel-id", "secret", "http://localhost/cb"), clock);
 
         when(memberDao.findByEmail(anyString())).thenReturn(Optional.empty());
         when(memberDao.findByGoogleSub(anyString())).thenReturn(Optional.empty());
@@ -301,6 +303,56 @@ class AuthServiceImplTest {
         assertThatThrownBy(() -> service.loginWithGoogle("id-token")).isInstanceOf(ConflictException.class);
 
         verify(refreshTokenStore, never()).issue(anyLong());
+    }
+
+    @Test
+    @DisplayName("LINE 登入：已經用 LINE 登入過（或綁過 LINE Bot）的會員直接登入")
+    void loginWithLineExisting() {
+        Member bound = member("a@example.com", PASSWORD);
+        bound.linkLine("U-line-1");
+        when(memberDao.findByLineUserId("U-line-1")).thenReturn(Optional.of(bound));
+
+        AuthResult result = service.loginWithLine(new LineLoginUser("U-line-1", "小明", null, null));
+
+        assertThat(result.member().id()).isEqualTo(7L);
+        assertThat(result.member().lineLinked()).isTrue();
+        assertThat(bound.getLastLoginAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("LINE 登入：第一次登入建立新會員；沒有 Email 也可以，名稱空白時用預設名稱")
+    void loginWithLineNewMember() {
+        when(memberDao.findByLineUserId("U-new")).thenReturn(Optional.empty());
+
+        service.loginWithLine(new LineLoginUser("U-new", " ", "https://profile.line-scdn.net/a.png", null));
+
+        ArgumentCaptor<Member> saved = ArgumentCaptor.forClass(Member.class);
+        verify(memberDao).save(saved.capture());
+        Member member = saved.getValue();
+        assertThat(member.getLineUserId()).isEqualTo("U-new");
+        assertThat(member.getEmail()).isNull();
+        assertThat(member.getDisplayName()).isEqualTo("LINE 使用者");
+        assertThat(member.getAvatarUrl()).isEqualTo("https://profile.line-scdn.net/a.png");
+        assertThat(member.hasPassword()).isFalse();
+    }
+
+    @Test
+    @DisplayName("LINE 登入：Email 已經被註冊過時回 409，不自動綁定（避免用別人的 Email 登入別人的帳號）")
+    void loginWithLineEmailTaken() {
+        when(memberDao.findByLineUserId("U-other")).thenReturn(Optional.empty());
+        when(memberDao.findByEmail("a@example.com")).thenReturn(Optional.of(member("a@example.com", PASSWORD)));
+
+        assertThatThrownBy(() -> service.loginWithLine(new LineLoginUser("U-other", "小明", null, "A@Example.com")))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("綁定 LINE");
+        verify(memberDao, never()).save(any());
+        verify(refreshTokenStore, never()).issue(anyLong());
+    }
+
+    @Test
+    @DisplayName("登入方式：有設定 LINE Login 就開放 LINE 登入")
+    void providersIncludeLine() {
+        assertThat(service.providers().lineLoginEnabled()).isTrue();
     }
 
     private Member member(String email, String password) {

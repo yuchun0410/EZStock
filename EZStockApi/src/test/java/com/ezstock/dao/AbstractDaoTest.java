@@ -225,6 +225,21 @@ abstract class AbstractDaoTest {
     }
 
     @Test
+    @DisplayName("會員：LINE 登入建立的會員可以沒有 Email，多個沒有 Email 的會員不會撞唯一索引")
+    void lineMember() {
+        LocalDateTime t = LocalDateTime.of(2026, 11, 10, 12, 0);
+        Member first = memberDao.save(Member.withLine("U-dao-line-login-1", null, "LINE 會員一", null, t));
+        Member second = memberDao.save(Member.withLine("U-dao-line-login-2", null, "LINE 會員二", null, t));
+
+        Member found = memberDao.findByLineUserId("U-dao-line-login-1").orElseThrow();
+        assertThat(found.getId()).isEqualTo(first.getId());
+        assertThat(found.getEmail()).isNull();
+        assertThat(found.hasPassword()).isFalse();
+        assertThat(memberDao.findByLineUserId("U-dao-line-login-2")).get()
+                .extracting(Member::getId).isEqualTo(second.getId());
+    }
+
+    @Test
     @DisplayName("自選股：新增後查得到股票名稱，重複新增不出錯，可以移除")
     void watchlist() {
         Member member = memberDao.save(Member.withPassword("watch@example.com", "hash", "自選股測試",

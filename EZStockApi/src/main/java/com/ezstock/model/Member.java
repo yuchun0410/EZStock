@@ -18,7 +18,8 @@ public class Member {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 254)
+    /** 只用 LINE 登入、沒提供 Email 的會員是 null */
+    @Column(unique = true, length = 254)
     private String email;
 
     @Column(name = "password_hash", length = 100)
@@ -65,6 +66,20 @@ public class Member {
     public static Member withGoogle(String email, String googleSub, String displayName, String avatarUrl,
                                     LocalDateTime now) {
         return new Member(email, null, googleSub, displayName, avatarUrl, now);
+    }
+
+    /**
+     * 第一次用 LINE 登入，自動建立的會員（沒有密碼）。
+     * LINE 的使用者 id 同時就是 LINE Bot 綁定用的 id（LINE Login 和 Bot 在同一個 provider 底下時兩邊一樣），
+     * 所以用 LINE 登入的人不用再輸入綁定碼，就能收到每日回報。
+     *
+     * @param email LINE 沒提供時是 null
+     */
+    public static Member withLine(String lineUserId, String email, String displayName, String avatarUrl,
+                                  LocalDateTime now) {
+        Member member = new Member(email, null, null, displayName, avatarUrl, now);
+        member.lineUserId = lineUserId;
+        return member;
     }
 
     /** Email 一律去空白、轉小寫，「Abc@Gmail.com」和「abc@gmail.com」是同一個人 */

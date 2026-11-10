@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { login } from '../api/authApi'
 import GoogleLoginButton from '../components/GoogleLoginButton'
+import LineLoginButton from '../components/LineLoginButton'
 import { useAuth } from '../hooks/useAuth'
 
 /** 登入。成功後回到原本要去的頁面（從哪裡被導來登入，就回哪裡） */
@@ -70,6 +71,7 @@ function LoginPage() {
         </button>
       </form>
       <GoogleLoginButton onSuccess={goBack} />
+      <LineLoginButton returnTo={from} />
       <p className="muted auth-switch">
         還沒有帳號？
         <Link to="/register" state={{ from }}>

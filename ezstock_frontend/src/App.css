@@ -1790,3 +1790,39 @@
   width: 35%;
   height: 12px;
 }
+
+/* ---------- LINE 登入 ---------- */
+.line-login {
+  margin-top: 10px;
+}
+
+/* LINE 官方的品牌綠，白字，跟 Google 按鈕一樣高 */
+.line-button {
+  width: 100%;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: none;
+  border-radius: 4px;
+  background: #06c755;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.line-button:hover:not(:disabled) {
+  background: #05b34c;
+}
+
+.line-button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.line-button-icon {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}

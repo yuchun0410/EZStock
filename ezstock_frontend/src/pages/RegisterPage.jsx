@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { register } from '../api/authApi'
 import GoogleLoginButton from '../components/GoogleLoginButton'
+import LineLoginButton from '../components/LineLoginButton'
 import { useAuth } from '../hooks/useAuth'
 
 const MIN_PASSWORD = 8
@@ -113,6 +114,7 @@ function RegisterPage() {
         </button>
       </form>
       <GoogleLoginButton onSuccess={goBack} />
+      <LineLoginButton returnTo={from} />
       <p className="muted auth-switch">
         已經有帳號？
         <Link to="/login" state={{ from }}>
