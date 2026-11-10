@@ -5,6 +5,7 @@ import com.ezstock.datasource.NewsItem;
 import com.ezstock.datasource.PriceBar;
 import com.ezstock.datasource.ShareSplit;
 import com.ezstock.datasource.StockInfo;
+import com.ezstock.model.Market;
 import com.ezstock.model.SplitType;
 import com.ezstock.model.StockType;
 import org.junit.jupiter.api.DisplayName;
@@ -173,6 +174,67 @@ class FinMindDataSourceTest {
         assertThat(infos.get(0).type()).isEqualTo(StockType.ETF);
         assertThat(infos.get(1).type()).isEqualTo(StockType.STOCK);
         assertThat(infos.get(1).industry()).isEqualTo("半導體業");
+    }
+
+    @Test
+    @DisplayName("美股清單：只取最新快照；ETF 全收，公司要市值 10 億美元以上且不是特別股；BRK/B 轉成 BRK-B")
+    void fetchUsStockInfos() {
+        setUp("my-token");
+        server.expect(queryParam("dataset", "USStockInfo"))
+                .andRespond(withSuccess("""
+                        {"msg":"success","status":200,"data":[
+                          {"date":"2026-11-10","stock_id":"AAPL","stock_name":"Apple Inc. Common Stock","Subsector":"Computer Manufacturing","MarketCap":4975380000000,"Country":"United States"},
+                          {"date":"2026-11-10","stock_id":"ACN","stock_name":"Accenture plc Class A Ordinary Shares (Ireland)","Subsector":"EDP Services","MarketCap":150000000000},
+                          {"date":"2026-11-10","stock_id":"SPY","stock_name":"State Street SPDR S&P 500 ETF Trust Unit","Subsector":"ETF","MarketCap":0},
+                          {"date":"2026-11-10","stock_id":"BRK/B","stock_name":"Berkshire Hathaway Inc.","Subsector":"n/a","MarketCap":1259940000000},
+                          {"date":"2026-11-10","stock_id":"TINY","stock_name":"Tiny Corp Common Stock","Subsector":"Biotech","MarketCap":50000000},
+                          {"date":"2026-11-10","stock_id":"AGNCL","stock_name":"AGNC Investment Corp. Depositary Shares Each Representing a 1/1000th Interest in a Share of 7.75% Preferred Stock","Subsector":"REIT","MarketCap":9000000000},
+                          {"date":"2026-11-10","stock_id":"BAC^B","stock_name":"Bank of America Preferred","Subsector":"Major Banks","MarketCap":300000000000},
+                          {"date":"2019-01-10","stock_id":"OLD","stock_name":"Delisted Inc.","Subsector":"n/a","MarketCap":5000000000},
+                          {"date":"None","stock_id":"^VIX","stock_name":"CBOE Volatility Index","Subsector":"","MarketCap":0}
+                        ]}""", MediaType.APPLICATION_JSON));
+
+        List<StockInfo> infos = dataSource.fetchUsStockInfos();
+
+        server.verify();
+        assertThat(infos).extracting(StockInfo::stockId).containsExactly("AAPL", "ACN", "SPY", "BRK-B");
+        assertThat(infos).allMatch(info -> info.market() == Market.US);
+        assertThat(infos.get(0).name()).isEqualTo("Apple Inc.");
+        assertThat(infos.get(1).name()).isEqualTo("Accenture plc Class A");
+        assertThat(infos.get(2).type()).isEqualTo(StockType.ETF);
+        assertThat(infos.get(3).industry()).isNull();
+    }
+
+    @Test
+    @DisplayName("美股日線：換算成還原價，開高低乘上同一個比例")
+    void fetchUsPrices() {
+        setUp("my-token");
+        server.expect(queryParam("dataset", "USStockPrice"))
+                .andExpect(queryParam("data_id", "AAPL"))
+                .andExpect(queryParam("start_date", "2021-11-01"))
+                .andRespond(withSuccess("""
+                        {"msg":"success","status":200,"data":[
+                          {"date":"2021-11-01","stock_id":"AAPL","Open":148.99,"High":149.70,"Low":147.80,"Close":148.96,"Adj_Close":145.29,"Volume":74588300},
+                          {"date":"2021-11-02","stock_id":"AAPL","Open":0,"High":0,"Low":0,"Close":0,"Adj_Close":0,"Volume":0}
+                        ]}""", MediaType.APPLICATION_JSON));
+
+        List<PriceBar> bars = dataSource.fetchUsPrices("AAPL", LocalDate.of(2021, 11, 1), LocalDate.of(2021, 11, 2));
+
+        server.verify();
+        assertThat(bars).singleElement().satisfies(bar -> {
+            assertThat(bar.close()).isEqualByComparingTo("145.29");
+            // 比例 145.29 / 148.96 ≈ 0.97536，開盤 148.99 × 比例 ≈ 145.32
+            assertThat(bar.open()).isEqualByComparingTo("145.32");
+            assertThat(bar.volume()).isEqualTo(74588300L);
+        });
+    }
+
+    @Test
+    @DisplayName("美股名稱：拿掉普通股說明，太長的截斷到 100 字")
+    void cleanUsName() {
+        assertThat(FinMindDataSource.cleanUsName("NVIDIA Corporation Common Stock")).isEqualTo("NVIDIA Corporation");
+        assertThat(FinMindDataSource.cleanUsName("Alphabet Inc. Class A Common Stock")).isEqualTo("Alphabet Inc. Class A");
+        assertThat(FinMindDataSource.cleanUsName("x".repeat(150))).hasSize(FinMindDataSource.NAME_MAX_LENGTH);
     }
 
     @Test

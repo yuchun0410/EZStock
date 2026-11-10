@@ -6,6 +6,7 @@ import com.ezstock.datasource.NewsItem;
 import com.ezstock.datasource.PriceBar;
 import com.ezstock.datasource.ShareSplit;
 import com.ezstock.datasource.StockInfo;
+import com.ezstock.model.Market;
 import com.ezstock.model.SplitType;
 import com.ezstock.model.StockType;
 import org.slf4j.Logger;
@@ -17,6 +18,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -26,6 +28,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * 透過 FinMind API 取得台股資料。
@@ -38,6 +41,25 @@ public class FinMindDataSource implements MarketDataSource {
 
     /** 上市股票與 ETF 的代號格式：4 碼數字開頭，後面最多 2 碼數字或英文 */
     private static final String LISTED_STOCK_ID = "\\d{4}[0-9A-Z]{0,2}";
+
+    /** 美股代號：1～5 個英文字母；或 BRK/B 這種「代號/股別」，查價格時要寫成 BRK-B */
+    private static final Pattern US_TICKER = Pattern.compile("[A-Z]{1,5}|[A-Z]{1,4}/[A-Z]");
+
+    /** 美股公司（非 ETF）至少要這麼大的市值才放進清單：排除幾千檔小型股、SPAC，搜尋結果才不會一堆沒人聽過的 */
+    static final BigDecimal US_MIN_MARKET_CAP = new BigDecimal("1000000000");
+
+    /** 名稱有這些字的是特別股、債券、權證、單位，不是普通股，不放進清單 */
+    private static final Pattern US_NON_COMMON = Pattern.compile(
+            "Preferred|Notes|Debentures|Warrant|Rights?$|Units?$|Unit |Depositary Shares (Each|each|rep)|Trust Securities|Senior|Subordinated|% ");
+
+    /** 名稱結尾的「普通股」說明拿掉，例如 "Apple Inc. Common Stock" → "Apple Inc." */
+    private static final Pattern US_NAME_SUFFIX = Pattern.compile(
+            "\\s+(Common Stock|Common Shares|Ordinary Shares?|American Depositary Shares?|American Depository Shares?|New York Registry Shares)$",
+            Pattern.CASE_INSENSITIVE);
+
+    static final int NAME_MAX_LENGTH = 100;
+
+    private static final Pattern ISO_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
 
     private final RestClient restClient;
     private final FinMindProperties properties;
@@ -103,6 +125,104 @@ public class FinMindDataSource implements MarketDataSource {
             log.info("[FinMind] {} 共略過 {} 筆無成交資料", stockId, skipped);
         }
         return bars;
+    }
+
+    /**
+     * 美股清單。FinMind 的 USStockInfo 有一萬多筆，混了好幾個日期的快照（下市的也在裡面）、
+     * 特別股（ABR^D）、權證、SPAC 等，所以：
+     * <ol>
+     *   <li>只取最新日期的快照（目前還在掛牌的）</li>
+     *   <li>代號只收一般格式；BRK/B 轉成 BRK-B（查價格要用這個寫法）</li>
+     *   <li>ETF 全收；公司要市值 10 億美元以上，而且名稱不是特別股、債券、權證</li>
+     * </ol>
+     */
+    @Override
+    public List<StockInfo> fetchUsStockInfos() {
+        List<FinMindDto.UsStockInfoRow> rows = call("USStockInfo", null, null, null,
+                new ParameterizedTypeReference<FinMindDto.Response<FinMindDto.UsStockInfoRow>>() {
+                });
+
+        String latest = rows.stream()
+                .map(FinMindDto.UsStockInfoRow::date)
+                .filter(date -> date != null && ISO_DATE.matcher(date).matches())
+                .max(String::compareTo)
+                .orElse(null);
+        if (latest == null) {
+            log.warn("[FinMind] 美股清單沒有任何有效日期，略過");
+            return List.of();
+        }
+
+        Map<String, StockInfo> infos = new LinkedHashMap<>();
+        int etfCount = 0;
+        for (FinMindDto.UsStockInfoRow row : rows) {
+            if (!latest.equals(row.date()) || row.stockId() == null || row.stockName() == null
+                    || !US_TICKER.matcher(row.stockId()).matches()) {
+                continue;
+            }
+            boolean etf = "ETF".equals(row.subsector());
+            if (!etf && (row.marketCap() == null || row.marketCap().compareTo(US_MIN_MARKET_CAP) < 0
+                    || US_NON_COMMON.matcher(row.stockName()).find())) {
+                continue;
+            }
+            String stockId = row.stockId().replace('/', '-');
+            String industry = row.subsector() == null || row.subsector().isBlank() || "n/a".equals(row.subsector())
+                    ? null : truncate(row.subsector().strip());
+            infos.putIfAbsent(stockId, new StockInfo(stockId, cleanUsName(row.stockName()),
+                    etf ? StockType.ETF : StockType.STOCK, Market.US, industry));
+            if (etf) {
+                etfCount++;
+            }
+        }
+        log.info("[FinMind] 美股清單（{} 快照）共 {} 檔：公司 {} 檔、ETF {} 檔（原始 {} 筆，略過舊快照、特別股、小型股等）",
+                latest, infos.size(), infos.size() - etfCount, etfCount, rows.size());
+        return List.copyOf(infos.values());
+    }
+
+    /** "Apple Inc. Common Stock" → "Apple Inc."；括號說明也拿掉；太長的截斷 */
+    static String cleanUsName(String raw) {
+        String name = raw.strip().replaceAll("\\s*\\(.*\\)$", "");
+        name = US_NAME_SUFFIX.matcher(name).replaceAll("").strip();
+        return truncate(name.isEmpty() ? raw.strip() : name);
+    }
+
+    private static String truncate(String text) {
+        return text.length() <= NAME_MAX_LENGTH ? text : text.substring(0, NAME_MAX_LENGTH);
+    }
+
+    /**
+     * 美股日線，換算成還原價：FinMind 的 Close 只還原了分割，Adj_Close 再還原股利。
+     * 開高低也乘上同一個比例（Adj_Close / Close），K 線形狀才不會變。
+     * 最新一天沒有之後的除息，比例是 1，所以畫面上的最新收盤就是真實價格。
+     */
+    @Override
+    public List<PriceBar> fetchUsPrices(String stockId, LocalDate from, LocalDate to) {
+        List<FinMindDto.UsPriceRow> rows = call("USStockPrice", stockId, from, to,
+                new ParameterizedTypeReference<FinMindDto.Response<FinMindDto.UsPriceRow>>() {
+                });
+
+        List<PriceBar> bars = new ArrayList<>();
+        int skipped = 0;
+        for (FinMindDto.UsPriceRow row : rows) {
+            if (row.date() == null || row.open() == null || row.high() == null || row.low() == null
+                    || row.close() == null || row.adjClose() == null
+                    || row.close().signum() <= 0 || row.adjClose().signum() <= 0 || row.open().signum() <= 0) {
+                skipped++;
+                continue;
+            }
+            BigDecimal ratio = row.adjClose().divide(row.close(), 10, RoundingMode.HALF_UP);
+            bars.add(new PriceBar(stockId, LocalDate.parse(row.date()),
+                    adjust(row.open(), ratio), adjust(row.high(), ratio), adjust(row.low(), ratio),
+                    row.adjClose().setScale(2, RoundingMode.HALF_UP),
+                    row.volume() == null ? 0L : row.volume().longValue()));
+        }
+        if (skipped > 0) {
+            log.info("[FinMind] {} 共略過 {} 筆資料不完整的美股日線", stockId, skipped);
+        }
+        return bars;
+    }
+
+    private static BigDecimal adjust(BigDecimal price, BigDecimal ratio) {
+        return price.multiply(ratio).setScale(2, RoundingMode.HALF_UP);
     }
 
     @Override

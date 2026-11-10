@@ -6,7 +6,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(properties = {"ezstock.dao.type=mybatis", "ezstock.import.run-on-startup=false"})
+@SpringBootTest(properties = {"ezstock.dao.type=mybatis", "ezstock.import.run-on-startup=false",
+        "ezstock.import.us-stock-list=false"})
 class MyBatisDaoTest extends AbstractDaoTest {
 
     @Test

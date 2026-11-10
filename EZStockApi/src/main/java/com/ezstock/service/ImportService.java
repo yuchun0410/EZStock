@@ -12,6 +12,9 @@ public interface ImportService {
      */
     ImportResult importAll();
 
+    /** 只匯入美股清單（不抓價格；價格等使用者查詢時才按需載入），回傳清單檔數 */
+    int importUsStockList();
+
     /** 只匯入一檔的日線與股利（股票必須已在股票清單中） */
     StockImportResult importStock(String stockId);
 

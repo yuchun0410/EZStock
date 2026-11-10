@@ -13,6 +13,7 @@ import com.ezstock.datasource.StockInfo;
 import com.ezstock.datasource.finmind.FinMindApiException;
 import com.ezstock.model.DailyPrice;
 import com.ezstock.model.Dividend;
+import com.ezstock.model.Market;
 import com.ezstock.model.SplitType;
 import com.ezstock.model.Stock;
 import com.ezstock.model.StockSplit;
@@ -248,6 +249,118 @@ class ImportServiceImplTest {
         assertThat(result.failed()).containsExactly("2317");
         assertThat(result.succeeded()).extracting(StockImportResult::stockId).containsExactly("2330", "0050");
         assertThat(result.totalPricesInserted()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("全部匯入：股票清單沒變動的不再寫一次，美股清單也一起匯入")
+    void importAllSavesOnlyChangedStocks() {
+        when(dataSource.fetchStockInfos()).thenReturn(List.of(
+                new StockInfo("2330", "台積電", StockType.STOCK, "半導體業"),
+                new StockInfo("2317", "鴻海", StockType.STOCK, "其他電子業")));
+        when(dataSource.fetchUsStockInfos()).thenReturn(List.of(
+                new StockInfo("AAPL", "Apple Inc.", StockType.STOCK, Market.US, "Computer Manufacturing")));
+        // 資料庫裡 2330 已經存在而且沒變；2317 改過名稱
+        when(stockDao.findAll()).thenReturn(List.of(
+                new Stock("2330", "台積電", StockType.STOCK, "半導體業"),
+                new Stock("2317", "鴻海精密", StockType.STOCK, "其他電子業")));
+
+        ImportResult result = createService(List.of()).importAll();
+
+        verify(stockDao, never()).save(org.mockito.ArgumentMatchers.argThat(s -> s.getStockId().equals("2330")));
+        verify(stockDao).save(org.mockito.ArgumentMatchers.argThat(s -> s.getStockId().equals("2317")));
+        verify(stockDao).save(org.mockito.ArgumentMatchers.argThat(
+                s -> s.getStockId().equals("AAPL") && s.getMarket() == Market.US));
+        assertThat(result.stockListCount()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("全部匯入：美股清單抓不到時，台股照樣匯入")
+    void importAllWhenUsListFails() {
+        when(dataSource.fetchStockInfos()).thenReturn(List.of(
+                new StockInfo("2330", "台積電", StockType.STOCK, "半導體業")));
+        when(dataSource.fetchUsStockInfos()).thenThrow(new FinMindApiException("FinMind 呼叫失敗：HTTP 402"));
+
+        ImportResult result = createService(List.of()).importAll();
+
+        verify(stockDao).save(any(Stock.class));
+        assertThat(result.stockListCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("美股匯入：用美股的還原價，不抓台股的股利、分割")
+    void importUsStock() {
+        usStock("AAPL");
+        when(dataSource.fetchUsPrices(eq("AAPL"), any(), any())).thenReturn(List.of(usBar("AAPL", TODAY, "250.00")));
+
+        StockImportResult result = createService(List.of()).importStock("AAPL");
+
+        assertThat(result.pricesInserted()).isEqualTo(1);
+        verify(dataSource).fetchUsPrices("AAPL", TODAY.minusYears(5), TODAY);
+        verify(dataSource, never()).fetchPrices(anyString(), any(), any());
+        verify(dataSource, never()).fetchCashDividends(anyString(), any(), any());
+        verify(dataSource, never()).fetchShareSplits(anyString(), any(), any());
+    }
+
+    @Test
+    @DisplayName("美股更新：最新那天的還原價沒變，只補新的日子")
+    void updateUsStockAppends() {
+        usStock("AAPL");
+        LocalDate latest = LocalDate.of(2026, 10, 26);
+        when(dailyPriceDao.findLatest("AAPL")).thenReturn(Optional.of(usPrice("AAPL", latest, "250.00")));
+        when(dailyPriceDao.findTradeDates(eq("AAPL"), any(), any())).thenReturn(List.of(latest));
+        when(dataSource.fetchUsPrices("AAPL", latest, TODAY)).thenReturn(List.of(
+                usBar("AAPL", latest, "250.00"), usBar("AAPL", LocalDate.of(2026, 10, 27), "252.00")));
+
+        StockImportResult result = createService(List.of()).updateStock("AAPL");
+
+        assertThat(result.pricesInserted()).isEqualTo(1);
+        assertThat(insertedPrices).extracting(DailyPrice::getTradeDate).containsExactly(LocalDate.of(2026, 10, 27));
+        verify(dailyPriceDao, never()).deleteByStock(anyString());
+    }
+
+    @Test
+    @DisplayName("美股更新：最新那天的還原價變了（中間有除息或分割），刪掉舊資料整段重抓")
+    void updateUsStockRebuildsWhenAdjusted() {
+        usStock("AAPL");
+        LocalDate latest = LocalDate.of(2026, 10, 26);
+        when(dailyPriceDao.findLatest("AAPL")).thenReturn(Optional.of(usPrice("AAPL", latest, "250.00")));
+        when(dataSource.fetchUsPrices("AAPL", latest, TODAY)).thenReturn(List.of(usBar("AAPL", latest, "249.40")));
+        when(dataSource.fetchUsPrices("AAPL", TODAY.minusYears(5), TODAY)).thenReturn(List.of(
+                usBar("AAPL", LocalDate.of(2021, 10, 28), "140.00"), usBar("AAPL", latest, "249.40")));
+
+        StockImportResult result = createService(List.of()).updateStock("AAPL");
+
+        verify(dailyPriceDao).deleteByStock("AAPL");
+        assertThat(result.pricesInserted()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("美股重抓：外部資料來源沒回傳資料時，不刪舊資料")
+    void rebuildKeepsOldDataWhenSourceEmpty() {
+        usStock("AAPL");
+        LocalDate latest = LocalDate.of(2026, 10, 26);
+        when(dailyPriceDao.findLatest("AAPL")).thenReturn(Optional.of(usPrice("AAPL", latest, "250.00")));
+        when(dataSource.fetchUsPrices("AAPL", latest, TODAY)).thenReturn(List.of(usBar("AAPL", latest, "249.40")));
+        when(dataSource.fetchUsPrices("AAPL", TODAY.minusYears(5), TODAY)).thenReturn(List.of());
+
+        createService(List.of()).updateStock("AAPL");
+
+        verify(dailyPriceDao, never()).deleteByStock(anyString());
+    }
+
+    private void usStock(String stockId) {
+        when(stockDao.findById(stockId)).thenReturn(Optional.of(
+                new Stock(stockId, "Apple Inc.", StockType.STOCK, Market.US, "Computer Manufacturing")));
+    }
+
+    private DailyPrice usPrice(String stockId, LocalDate date, String close) {
+        BigDecimal p = new BigDecimal(close);
+        return new DailyPrice(new Stock(stockId, "Apple Inc.", StockType.STOCK, Market.US, null), date, p, p, p, p, 1_000L);
+    }
+
+    private PriceBar usBar(String stockId, LocalDate date, String close) {
+        BigDecimal p = new BigDecimal(close);
+        return new PriceBar(stockId, date, p, p, p, p, 1_000L);
     }
 
     private DailyPrice price(LocalDate date) {

@@ -2,6 +2,7 @@ package com.ezstock.service.impl;
 
 import com.ezstock.dao.DailyPriceDao;
 import com.ezstock.model.DailyPrice;
+import com.ezstock.model.Market;
 import com.ezstock.service.ImportService;
 import com.ezstock.service.PriceLoader;
 import com.ezstock.service.StockImportResult;
@@ -15,7 +16,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,9 +31,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public class OnDemandPriceLoader implements PriceLoader {
 
     private static final Logger log = LoggerFactory.getLogger(OnDemandPriceLoader.class);
-
-    /** 台股 13:30 收盤，外部資料來源大約下午才更新，16:00 之後才預期有今天的資料 */
-    static final LocalTime DATA_READY_TIME = LocalTime.of(16, 0);
 
     /** 同一檔股票補資料後，至少隔這麼久才會再試（例如遇到國定假日，今天本來就不會有資料） */
     static final Duration REFRESH_INTERVAL = Duration.ofHours(3);
@@ -93,7 +90,7 @@ public class OnDemandPriceLoader implements PriceLoader {
      * 補資料失敗不往外丟：舊資料還是可以用，不要因為外部 API 暫時有問題就讓整個查詢失敗。
      */
     private void refreshIfStale(String stockId, LocalDate latestDate) {
-        LocalDate expected = expectedLatestTradingDay();
+        LocalDate expected = expectedLatestTradingDay(Market.fromStockId(stockId));
         if (!latestDate.isBefore(expected) || recentlyRefreshed(stockId)) {
             return;
         }
@@ -113,10 +110,25 @@ public class OnDemandPriceLoader implements PriceLoader {
         }
     }
 
-    /** 現在應該要有的最新交易日：16:00 之前是前一天；週末往前推到週五（國定假日不判斷，靠 REFRESH_INTERVAL 避免一直重試） */
+    /** 台股現在應該要有的最新交易日 */
     LocalDate expectedLatestTradingDay() {
+        return expectedLatestTradingDay(Market.TW);
+    }
+
+    /**
+     * 現在應該要有的最新交易日（國定假日不判斷，靠 REFRESH_INTERVAL 避免一直重試）：
+     * <ul>
+     *   <li>台股：16:00 之前是前一天，之後是今天</li>
+     *   <li>美股：差一天，08:00 之前是前兩天，之後是前一天（例如週二早上 10 點，應該有美國週一的資料）</li>
+     * </ul>
+     * 算出來是週末的話往前推到週五。
+     */
+    LocalDate expectedLatestTradingDay(Market market) {
         LocalDateTime now = LocalDateTime.now(clock);
-        LocalDate date = now.toLocalTime().isBefore(DATA_READY_TIME) ? now.toLocalDate().minusDays(1) : now.toLocalDate();
+        LocalDate date = now.toLocalDate().minusDays(market.dataLagDays());
+        if (now.toLocalTime().isBefore(market.dataReadyTime())) {
+            date = date.minusDays(1);
+        }
         while (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY) {
             date = date.minusDays(1);
         }
