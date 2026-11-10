@@ -7,12 +7,15 @@ import com.ezstock.repository.PostRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -65,5 +68,47 @@ public class PostJpaDao implements PostDao {
     public void addCommentCount(long postId, int delta) {
         repository.addCommentCount(postId, delta);
         log.debug("[JPA] 文章 id={} 留言數 {}{}", postId, delta > 0 ? "+" : "", delta);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Post> findRecent(String stockId, LocalDateTime since, int limit) {
+        List<Post> posts = stockId == null
+                ? repository.findRecent(since, Limit.of(limit))
+                : repository.findRecentByStock(stockId, since, Limit.of(limit));
+        posts.forEach(post -> post.getStockIds().size());
+        log.debug("[JPA] 熱門候選 股票={} {} 之後的文章 {} 篇", stockId == null ? "全部" : stockId, since, posts.size());
+        return posts;
+    }
+
+    @Override
+    @Transactional
+    public boolean addLike(long postId, long memberId, LocalDateTime now) {
+        return repository.insertLike(postId, memberId, now) == 1;
+    }
+
+    @Override
+    @Transactional
+    public boolean removeLike(long postId, long memberId) {
+        return repository.deleteLike(postId, memberId) == 1;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasLiked(long postId, long memberId) {
+        return repository.countLike(postId, memberId) > 0;
+    }
+
+    @Override
+    @Transactional
+    public void addLikeCount(long postId, int delta) {
+        repository.addLikeCount(postId, delta);
+        log.debug("[JPA] 文章 id={} 讚數 {}{}", postId, delta > 0 ? "+" : "", delta);
+    }
+
+    @Override
+    @Transactional
+    public void incrementViewCount(long postId) {
+        repository.incrementViewCount(postId);
     }
 }

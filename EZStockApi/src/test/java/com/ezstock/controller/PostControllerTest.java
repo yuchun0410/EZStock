@@ -1,10 +1,12 @@
 package com.ezstock.controller;
 
 import com.ezstock.config.RequestLoggingFilter;
+import com.ezstock.dto.LikeResponse;
 import com.ezstock.dto.PostPageResponse;
 import com.ezstock.exception.ForbiddenException;
 import com.ezstock.exception.GlobalExceptionHandler;
 import com.ezstock.service.ForumService;
+import com.ezstock.service.PostSort;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -22,7 +24,9 @@ import java.util.List;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -55,24 +59,42 @@ class PostControllerTest {
     }
 
     @Test
-    @DisplayName("列表：沒登入也能看，股票與頁數從參數帶入")
+    @DisplayName("列表：沒登入也能看，股票、排序與頁數從參數帶入；沒給排序是最新")
     void list() throws Exception {
-        when(service.listPosts("2330", 1)).thenReturn(new PostPageResponse(List.of(), 1, 20, 0, 0));
+        when(service.listPosts("2330", PostSort.HOT, 1)).thenReturn(new PostPageResponse(List.of(), 1, 20, 0, 0));
 
-        mockMvc.perform(get("/api/posts").param("stockId", "2330").param("page", "1"))
+        mockMvc.perform(get("/api/posts").param("stockId", "2330").param("sort", "hot").param("page", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page").value(1));
+
+        mockMvc.perform(get("/api/posts")).andExpect(status().isOk());
+        verify(service).listPosts(null, PostSort.LATEST, 0);
     }
 
     @Test
     @DisplayName("文章內頁：沒登入時 viewerId 是 null；登入時用 JWT 的會員 id")
     void viewer() throws Exception {
         mockMvc.perform(get("/api/posts/10")).andExpect(status().isOk());
-        verify(service).getPost(10L, null);
+        verify(service).viewPost(eq(10L), isNull(), anyString());
 
         login(7);
         mockMvc.perform(get("/api/posts/10")).andExpect(status().isOk());
-        verify(service).getPost(10L, 7L);
+        verify(service).viewPost(eq(10L), eq(7L), anyString());
+    }
+
+    @Test
+    @DisplayName("按讚、收回讚：用 JWT 的會員 id")
+    void like() throws Exception {
+        login(7);
+        when(service.like(7L, 10L)).thenReturn(new LikeResponse(true, 3));
+
+        mockMvc.perform(post("/api/posts/10/like"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.liked").value(true))
+                .andExpect(jsonPath("$.likeCount").value(3));
+
+        mockMvc.perform(delete("/api/posts/10/like")).andExpect(status().isOk());
+        verify(service).unlike(7L, 10L);
     }
 
     @Test

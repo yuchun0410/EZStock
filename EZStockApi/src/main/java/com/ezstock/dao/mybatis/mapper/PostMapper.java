@@ -4,6 +4,7 @@ import com.ezstock.model.Post;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -29,4 +30,17 @@ public interface PostMapper {
     int insertStockIds(@Param("postId") long postId, @Param("stockIds") Collection<String> stockIds);
 
     int addCommentCount(@Param("id") long id, @Param("delta") int delta);
+
+    List<Post> findRecent(@Param("stockId") String stockId, @Param("since") LocalDateTime since,
+                          @Param("limit") int limit);
+
+    int insertLike(@Param("postId") long postId, @Param("memberId") long memberId, @Param("now") LocalDateTime now);
+
+    int deleteLike(@Param("postId") long postId, @Param("memberId") long memberId);
+
+    long countLike(@Param("postId") long postId, @Param("memberId") long memberId);
+
+    int addLikeCount(@Param("id") long id, @Param("delta") int delta);
+
+    int incrementViewCount(@Param("id") long id);
 }
