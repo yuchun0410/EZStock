@@ -30,6 +30,9 @@ public interface MarketDataSource {
     /** 某檔股票某段期間的股票分割與面額變更（會讓股數改變的事件） */
     List<ShareSplit> fetchShareSplits(String stockId, LocalDate from, LocalDate to);
 
+    /** 某種外幣某段期間對台幣的匯率（例如 USD），依日期由舊到新 */
+    List<ExchangeRate> fetchExchangeRates(String currency, LocalDate from, LocalDate to);
+
     /** 某檔股票某一天的相關新聞 */
     List<NewsItem> fetchNews(String stockId, LocalDate date);
 }

@@ -100,4 +100,13 @@ final class FinMindDto {
             @JsonProperty("Adj_Close") BigDecimal adjClose,
             @JsonProperty("Volume") BigDecimal volume) {
     }
+
+    /** TaiwanExchangeRate（臺灣銀行牌告匯率；沒有報價的日子會是 -99） */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record ExchangeRateRow(
+            @JsonProperty("date") String date,
+            @JsonProperty("currency") String currency,
+            @JsonProperty("spot_buy") BigDecimal spotBuy,
+            @JsonProperty("spot_sell") BigDecimal spotSell) {
+    }
 }
