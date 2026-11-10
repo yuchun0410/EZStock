@@ -1,8 +1,18 @@
 import { apiDelete, apiGet, apiPost, apiPut } from './client'
 
-/** 文章列表：{ stockId?, page } → { items, page, size, total, totalPages } */
-export function listPosts({ stockId, page = 0 } = {}) {
-  return apiGet('/api/posts', { stockId, page })
+/** 文章列表：{ stockId?, sort: 'hot' | 'latest', page } → { items, page, size, total, totalPages } */
+export function listPosts({ stockId, sort = 'latest', page = 0 } = {}) {
+  return apiGet('/api/posts', { stockId, sort, page })
+}
+
+/** 按讚 → { liked, likeCount } */
+export function likePost(postId) {
+  return apiPost(`/api/posts/${postId}/like`)
+}
+
+/** 收回讚 → { liked, likeCount } */
+export function unlikePost(postId) {
+  return apiDelete(`/api/posts/${postId}/like`)
 }
 
 export function getPost(postId) {

@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { formatDateTime } from '../utils/format'
+import PostStats from './PostStats'
 import StockTagChip from './StockTagChip'
 
 /**
@@ -25,7 +26,7 @@ function PostList({ posts, onStockClick }) {
             <span>{post.author.displayName}</span>
             <span className="muted">{formatDateTime(post.createdAt)}</span>
             {post.edited && <span className="muted">（已編輯）</span>}
-            <span className="muted">留言 {post.commentCount}</span>
+            <PostStats post={post} />
             {post.stocks.map((stock) => (
               <StockTagChip key={stock.stockId} stock={stock} onClick={onStockClick} />
             ))}

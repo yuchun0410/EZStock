@@ -1901,3 +1901,82 @@
     margin: 0 -12px;
   }
 }
+
+/* =========================================================
+ * 論壇：排序分頁籤、讚／留言／瀏覽數、按讚按鈕
+ * ========================================================= */
+.forum-sort {
+  margin: 4px 0 8px;
+}
+
+.forum-sort-hint {
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+}
+
+.post-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-muted);
+  font-family: var(--font-number);
+  font-variant-numeric: tabular-nums;
+}
+
+.post-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.post-stat-icon {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+
+.post-reactions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.like-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.like-button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* 按過讚：品牌色實心，圖示也填滿 */
+.like-button.liked {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.like-button.liked .post-stat-icon {
+  fill: currentColor;
+}
+
+.like-button .post-stat-icon {
+  width: 17px;
+  height: 17px;
+}
