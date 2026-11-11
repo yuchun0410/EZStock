@@ -144,15 +144,20 @@ public class AssetServiceImpl implements AssetService {
     public AssetSummaryResponse saveHolding(long memberId, String stockId, HoldingRequest request) {
         String id = stockId.trim().toUpperCase();
         Stock stock = stockDao.findById(id).orElseThrow(() -> new ResourceNotFoundException("查無股票 " + id));
+        BigDecimal shares = request.shares().stripTrailingZeros();
+        if (!stock.isUs() && shares.scale() > 0) {
+            // 台股沒有碎股，零股也是整數股
+            throw new BadRequestException("台股的股數要是整數（零股也是 1 股為單位）");
+        }
         List<StockHolding> current = stockHoldingDao.findByMember(memberId);
         boolean exists = current.stream().anyMatch(h -> h.getId().getStockId().equals(id));
         if (!exists && current.size() >= MAX_HOLDINGS) {
             throw new BadRequestException("持股最多 " + MAX_HOLDINGS + " 檔");
         }
-        stockHoldingDao.upsert(new StockHolding(memberId, stock, request.shares(), request.averageCost(),
+        stockHoldingDao.upsert(new StockHolding(memberId, stock, shares.setScale(5), request.averageCost(),
                 LocalDateTime.now(clock)));
         log.info("[資產] 會員 id={} {}持股 {} {}：{} 股，平均成本 {}", memberId, exists ? "修改" : "新增",
-                id, stock.getName(), request.shares(), request.averageCost());
+                id, stock.getName(), shares.toPlainString(), request.averageCost());
         return summary(memberId);
     }
 
@@ -173,7 +178,7 @@ public class AssetServiceImpl implements AssetService {
     private HoldingResponse toResponse(StockHolding holding, List<String> notes, FxRate usdTwd) {
         Stock stock = holding.getStock();
         String stockId = stock.getStockId();
-        BigDecimal cost = holding.getAverageCost().multiply(BigDecimal.valueOf(holding.getShares()))
+        BigDecimal cost = holding.getAverageCost().multiply(holding.getShares())
                 .setScale(2, RoundingMode.HALF_UP);
         try {
             priceLoader.ensureLoaded(stockId);
@@ -192,7 +197,7 @@ public class AssetServiceImpl implements AssetService {
                     holding.getAverageCost(), cost, null, null, null, null, null, twd(cost, toTwd), null);
         }
         BigDecimal price = latest.get().getClosePrice();
-        BigDecimal value = price.multiply(BigDecimal.valueOf(holding.getShares())).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal value = price.multiply(holding.getShares()).setScale(2, RoundingMode.HALF_UP);
         BigDecimal pnl = value.subtract(cost);
         return new HoldingResponse(stockId, stock.getName(), stock.getType(), currency, holding.getShares(),
                 holding.getAverageCost(), cost, price, latest.get().getTradeDate(), value, pnl, percent(pnl, cost),

@@ -95,6 +95,11 @@ class AssetControllerTest {
         mockMvc.perform(put("/api/members/me/assets/holdings/2330").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"shares\":0,\"averageCost\":0}"))
                 .andExpect(status().isBadRequest());
+        // 碎股最多小數點後 5 位
+        mockMvc.perform(put("/api/members/me/assets/holdings/AAPL").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"shares\":0.123456,\"averageCost\":200}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("小數點後 5 位")));
 
         verify(service, never()).createAccount(anyLong(), any());
         verify(service, never()).saveHolding(anyLong(), any(), any());
