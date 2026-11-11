@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { formatMoney, formatPrice, formatSigned, formatSignedMoney, trendClass } from '../utils/format'
+import { formatMoney, formatPrice, formatShares, formatSigned, formatSignedMoney, isUsStock, trendClass } from '../utils/format'
 
 /** 美股的金額是美元，前面加 US$；台股不加 */
 function usd(h) {
@@ -33,6 +33,8 @@ function HoldingTable({ holdings, busy, onSave, onDelete }) {
   }
 
   const editingExisting = stocks.length === 1 && holdings.some((h) => h.stockId === stocks[0].stockId)
+  // 美股可以買碎股（最多小數點後 5 位），台股只能是整數
+  const fractional = stocks.length === 1 && isUsStock(stocks[0].stockId)
 
   return (
     <section className="asset-section">
@@ -63,7 +65,7 @@ function HoldingTable({ holdings, busy, onSave, onDelete }) {
                       {h.stockId} {h.name}
                     </Link>
                   </td>
-                  <td className="num">{formatMoney(h.shares)}</td>
+                  <td className="num">{formatShares(h.shares)}</td>
                   <td className="num">{usd(h) + formatPrice(h.averageCost)}</td>
                   <td className="num">
                     {h.price == null ? '—' : usd(h) + formatPrice(h.price)}
@@ -115,12 +117,14 @@ function HoldingTable({ holdings, busy, onSave, onDelete }) {
               className="form-input holding-input"
               value={draft.shares}
               onChange={(event) => setDraft({ ...draft, shares: event.target.value })}
-              min={1}
-              step={1}
-              placeholder="例如 1000"
+              min={fractional ? 0.00001 : 1}
+              step={fractional ? 0.00001 : 1}
+              placeholder={fractional ? '例如 0.12345' : '例如 1000'}
               required
             />
-            <span className="muted form-hint">台股 1 張 = 1000 股；美股以股計算</span>
+            <span className="muted form-hint">
+              {fractional ? '美股可以填碎股，最多小數點後 5 位' : '台股 1 張 = 1000 股，要是整數'}
+            </span>
           </label>
           <label className="form-field">
             <span className="form-label">每股平均成本</span>
