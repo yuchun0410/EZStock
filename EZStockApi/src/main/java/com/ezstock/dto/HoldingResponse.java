@@ -21,7 +21,7 @@ import java.time.LocalDate;
  * @param marketValueTwd 現值換算成台幣（台股跟 marketValue 一樣）；沒有股價或抓不到匯率時是 null
  */
 public record HoldingResponse(String stockId, String name, StockType type, String currency,
-                              long shares, BigDecimal averageCost, BigDecimal cost,
+                              BigDecimal shares, BigDecimal averageCost, BigDecimal cost,
                               BigDecimal price, LocalDate priceDate,
                               BigDecimal marketValue, BigDecimal unrealizedPnl, BigDecimal returnPercent,
                               BigDecimal costTwd, BigDecimal marketValueTwd) {

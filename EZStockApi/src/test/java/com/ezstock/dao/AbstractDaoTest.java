@@ -337,7 +337,7 @@ abstract class AbstractDaoTest {
                 .singleElement()
                 .satisfies(h -> {
                     assertThat(h.getStock().getName()).isEqualTo("測試股票");
-                    assertThat(h.getShares()).isEqualTo(2500);
+                    assertThat(h.getShares()).isEqualByComparingTo("2500");
                     assertThat(h.getAverageCost()).isEqualByComparingTo("98.25");
                     assertThat(h.getUpdatedAt()).isEqualTo(t.plusDays(1));
                 });

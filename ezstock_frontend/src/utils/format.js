@@ -74,6 +74,14 @@ export function toIsoDate(date) {
 
 const moneyFormat = new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 0 })
 
+const sharesFormat = new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 5 })
+
+/** 股數：台股是整數，美股碎股最多小數點後 5 位，多餘的 0 不顯示（1000 → "1,000"、0.12340 → "0.1234"） */
+export function formatShares(value) {
+  if (value == null) return '-'
+  return sharesFormat.format(Number(value))
+}
+
 /** 1234567 → "1,234,567" */
 export function formatMoney(value) {
   if (value == null) return '-'

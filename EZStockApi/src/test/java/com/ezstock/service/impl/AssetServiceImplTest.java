@@ -178,11 +178,11 @@ class AssetServiceImplTest {
         when(stockDao.findById("2330")).thenReturn(Optional.of(tsmc));
         when(stockDao.findById("ABC")).thenReturn(Optional.empty());
 
-        service.saveHolding(ME, " 2330 ", new HoldingRequest(3000L, new BigDecimal("950")));
+        service.saveHolding(ME, " 2330 ", new HoldingRequest(new BigDecimal("3000"), new BigDecimal("950")));
         verify(stockHoldingDao).upsert(org.mockito.ArgumentMatchers.argThat(h ->
-                h.getId().getStockId().equals("2330") && h.getShares() == 3000));
+                h.getId().getStockId().equals("2330") && h.getShares().compareTo(new BigDecimal("3000")) == 0));
 
-        assertThatThrownBy(() -> service.saveHolding(ME, "abc", new HoldingRequest(1L, BigDecimal.ONE)))
+        assertThatThrownBy(() -> service.saveHolding(ME, "abc", new HoldingRequest(BigDecimal.ONE, BigDecimal.ONE)))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -236,6 +236,40 @@ class AssetServiceImplTest {
         service.summary(ME);
 
         verify(exchangeRateService, never()).latestUsdTwd();
+    }
+
+    @Test
+    @DisplayName("持股：美股可以存碎股（小數點後 5 位）；台股的股數一定要是整數")
+    void fractionalShares() {
+        Stock apple = new Stock("AAPL", "Apple Inc.", StockType.STOCK, Market.US, null);
+        when(stockDao.findById("AAPL")).thenReturn(Optional.of(apple));
+        when(stockDao.findById("2330")).thenReturn(Optional.of(tsmc));
+
+        service.saveHolding(ME, "AAPL", new HoldingRequest(new BigDecimal("0.12345"), new BigDecimal("200")));
+        verify(stockHoldingDao).upsert(org.mockito.ArgumentMatchers.argThat(h ->
+                h.getId().getStockId().equals("AAPL") && h.getShares().compareTo(new BigDecimal("0.12345")) == 0));
+
+        assertThatThrownBy(() -> service.saveHolding(ME, "2330", new HoldingRequest(new BigDecimal("1.5"), new BigDecimal("950"))))
+                .isInstanceOf(BadRequestException.class).hasMessageContaining("整數");
+        // 1000.00000 這種小數部分都是 0 的，還是算整數
+        service.saveHolding(ME, "2330", new HoldingRequest(new BigDecimal("1000.00000"), new BigDecimal("950")));
+    }
+
+    @Test
+    @DisplayName("美股碎股：現值 = 碎股股數 × 股價，四捨五入到小數 2 位")
+    void fractionalValue() {
+        Stock apple = new Stock("AAPL", "Apple Inc.", StockType.STOCK, Market.US, null);
+        when(stockHoldingDao.findByMember(ME)).thenReturn(List.of(
+                new StockHolding(ME, apple, new BigDecimal("0.12345"), new BigDecimal("200"), T)));
+        when(dailyPriceDao.findLatest("AAPL")).thenReturn(Optional.of(price(apple, "250")));
+        when(exchangeRateService.latestUsdTwd()).thenReturn(Optional.of(
+                new FxRate("USD", new BigDecimal("32.5"), LocalDate.of(2026, 10, 30))));
+
+        HoldingResponse row = service.summary(ME).holdings().getFirst();
+
+        // 0.12345 × 250 = 30.8625 → 30.86；成本 0.12345 × 200 = 24.69
+        assertThat(row.marketValue()).isEqualByComparingTo("30.86");
+        assertThat(row.cost()).isEqualByComparingTo("24.69");
     }
 
     @Test

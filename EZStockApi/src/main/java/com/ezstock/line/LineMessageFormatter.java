@@ -38,7 +38,7 @@ public class LineMessageFormatter {
             text.append("\n\n【持股】");
             for (HoldingResponse h : holdings) {
                 text.append('\n').append(h.stockId()).append(' ').append(h.name())
-                        .append(' ').append(new DecimalFormat("#,##0").format(h.shares())).append(" 股");
+                        .append(' ').append(new DecimalFormat("#,##0.#####").format(h.shares())).append(" 股");
                 if (h.marketValue() == null) {
                     text.append("｜沒有股價");
                 } else if ("USD".equals(h.currency())) {

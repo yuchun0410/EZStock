@@ -23,8 +23,9 @@ public class StockHolding {
     @JoinColumn(name = "stock_id")
     private Stock stock;
 
-    @Column(nullable = false)
-    private Long shares;
+    /** 台股是整數；美股可以有碎股，最多小數點後 5 位 */
+    @Column(nullable = false, precision = 19, scale = 5)
+    private BigDecimal shares;
 
     @Column(name = "average_cost", nullable = false, precision = 12, scale = 4)
     private BigDecimal averageCost;
@@ -35,7 +36,12 @@ public class StockHolding {
     protected StockHolding() {
     }
 
+    /** 整數股數（台股） */
     public StockHolding(long memberId, Stock stock, long shares, BigDecimal averageCost, LocalDateTime updatedAt) {
+        this(memberId, stock, BigDecimal.valueOf(shares), averageCost, updatedAt);
+    }
+
+    public StockHolding(long memberId, Stock stock, BigDecimal shares, BigDecimal averageCost, LocalDateTime updatedAt) {
         this.id = new Key(memberId, stock.getStockId());
         this.stock = stock;
         this.shares = shares;
@@ -46,7 +52,7 @@ public class StockHolding {
     public Key getId() { return id; }
     public long getMemberId() { return id.getMemberId(); }
     public Stock getStock() { return stock; }
-    public long getShares() { return shares; }
+    public BigDecimal getShares() { return shares; }
     public BigDecimal getAverageCost() { return averageCost; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
 
