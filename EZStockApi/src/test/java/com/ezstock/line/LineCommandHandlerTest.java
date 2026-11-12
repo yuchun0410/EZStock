@@ -6,6 +6,10 @@ import com.ezstock.dto.AssetSummaryResponse;
 import com.ezstock.dao.StockDao;
 import com.ezstock.model.DailyPrice;
 import com.ezstock.model.Member;
+import com.ezstock.market.IndexQuote;
+import com.ezstock.market.InstitutionalService;
+import com.ezstock.market.InstitutionalSummary;
+import com.ezstock.market.MarketIndexService;
 import com.ezstock.model.Stock;
 import com.ezstock.model.StockType;
 import com.ezstock.service.AssetService;
@@ -39,6 +43,8 @@ class LineCommandHandlerTest {
     private MemberDao memberDao;
     private AssetService assetService;
     private PriceAlertService alertService;
+    private InstitutionalService institutionalService;
+    private MarketIndexService marketIndexService;
     private LineCommandHandler handler;
 
     @BeforeEach
@@ -50,8 +56,11 @@ class LineCommandHandlerTest {
         memberDao = mock(MemberDao.class);
         assetService = mock(AssetService.class);
         alertService = mock(PriceAlertService.class);
+        institutionalService = mock(InstitutionalService.class);
+        marketIndexService = mock(MarketIndexService.class);
         handler = new LineCommandHandler(stockDao, dailyPriceDao, bindingService, memberDao, assetService,
-                new LineMessageFormatter(), mock(LineDailyReportService.class), alertService, clock);
+                new LineMessageFormatter(), mock(LineDailyReportService.class), alertService,
+                institutionalService, marketIndexService, clock);
         when(memberDao.findByLineUserId(anyString())).thenReturn(Optional.empty());
 
         when(stockDao.findById(anyString())).thenReturn(Optional.empty());
@@ -61,6 +70,31 @@ class LineCommandHandlerTest {
         when(dailyPriceDao.findByStocksSince(any(), any())).thenReturn(List.of(
                 price(LocalDate.of(2026, 10, 29), "2415"),
                 price(LocalDate.of(2026, 10, 30), "2370")));
+    }
+
+    @Test
+    @DisplayName("法人：不用綁定，回覆加權指數與三大法人買賣超（億元，標示買超／賣超）")
+    void institutional() {
+        LocalDate day = LocalDate.of(2026, 11, 12);
+        when(institutionalService.latest()).thenReturn(new InstitutionalSummary(day, List.of(
+                new InstitutionalSummary.Group("外資", new BigDecimal("38609179554"), new BigDecimal("39293683437"),
+                        new BigDecimal("-684503883")),
+                new InstitutionalSummary.Group("投信", new BigDecimal("50364151226"), new BigDecimal("37978721000"),
+                        new BigDecimal("12385430226")),
+                new InstitutionalSummary.Group("自營商", BigDecimal.ZERO, new BigDecimal("654096820"),
+                        new BigDecimal("-654096820"))),
+                new InstitutionalSummary.Group("合計", BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("11046829523"))));
+        when(marketIndexService.all()).thenReturn(List.of(new IndexQuote("TAIEX", "加權指數", "台股大盤", "TW", day,
+                new BigDecimal("43091.87"), new BigDecimal("-1165.28"), new BigDecimal("-2.63"), List.of())));
+
+        String reply = handler.handle("U1", "法人").getFirst();
+
+        assertThat(reply).startsWith("三大法人買賣超（11/12）")
+                .contains("加權指數 43,091.87 ▼1,165.28（-2.63%）")
+                .contains("・外資 -6.85 億（賣超）")
+                .contains("・投信 +123.85 億（買超）")
+                .contains("合計 +110.47 億（買超）");
+        assertThat(handler.handle("U1", "三大法人").getFirst()).startsWith("三大法人買賣超");
     }
 
     @Test

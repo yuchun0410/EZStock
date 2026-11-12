@@ -2,6 +2,8 @@ package com.ezstock.line;
 
 import com.ezstock.dto.AssetSummaryResponse;
 import com.ezstock.dto.HoldingResponse;
+import com.ezstock.market.IndexQuote;
+import com.ezstock.market.InstitutionalSummary;
 import com.ezstock.dto.MoneyAccountResponse;
 import com.ezstock.model.AccountKind;
 import org.springframework.stereotype.Component;
@@ -66,6 +68,46 @@ public class LineMessageFormatter {
             }
         }
         return text.toString();
+    }
+
+    /**
+     * 三大法人買賣超，例如：
+     * <pre>
+     * 三大法人買賣超（11/12）
+     * 加權指數 43,091.87 ▼1,165.28（-2.63%）
+     * ・外資 -6.85 億（賣超）
+     * ・投信 +123.85 億（買超）
+     * ・自營商 -6.54 億（賣超）
+     * 合計 +110.46 億（買超）
+     * </pre>
+     *
+     * @param taiex 加權指數；抓不到就是 null，不顯示那一行
+     */
+    public String institutionalReport(InstitutionalSummary summary, IndexQuote taiex) {
+        if (summary.date() == null) {
+            return "三大法人的資料暫時抓不到，請稍後再試。";
+        }
+        StringBuilder text = new StringBuilder("三大法人買賣超（").append(summary.date().format(DATE)).append("）");
+        if (taiex != null && taiex.close() != null) {
+            text.append("\n加權指數 ").append(money2(taiex.close()));
+            if (taiex.change() != null) {
+                text.append(' ').append(taiex.change().signum() > 0 ? "▲" : taiex.change().signum() < 0 ? "▼" : "")
+                        .append(money2(taiex.change().abs()))
+                        .append("（").append(signedPercent(taiex.changePercent())).append("）");
+            }
+        }
+        for (InstitutionalSummary.Group group : summary.groups()) {
+            text.append("\n・").append(group.name()).append(' ').append(yi(group.net()));
+        }
+        text.append("\n合計 ").append(yi(summary.total().net()));
+        return text.toString();
+    }
+
+    /** 金額（元）→「+123.85 億（買超）」 */
+    static String yi(BigDecimal amount) {
+        BigDecimal yi = amount.divide(new BigDecimal("100000000"), 2, java.math.RoundingMode.HALF_UP);
+        String sign = yi.signum() > 0 ? "+" : "";
+        return sign + new DecimalFormat("#,##0.00").format(yi) + " 億（" + (amount.signum() >= 0 ? "買超" : "賣超") + "）";
     }
 
     static String money(BigDecimal value) {
