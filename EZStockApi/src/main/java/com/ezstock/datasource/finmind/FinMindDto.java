@@ -109,4 +109,13 @@ final class FinMindDto {
             @JsonProperty("spot_buy") BigDecimal spotBuy,
             @JsonProperty("spot_sell") BigDecimal spotSell) {
     }
+
+    /** TaiwanStockTotalInstitutionalInvestors（整體市場三大法人買賣金額） */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record InstitutionalRow(
+            @JsonProperty("date") String date,
+            @JsonProperty("name") String name,
+            @JsonProperty("buy") BigDecimal buy,
+            @JsonProperty("sell") BigDecimal sell) {
+    }
 }
