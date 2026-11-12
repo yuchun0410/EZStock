@@ -36,9 +36,7 @@ function Header() {
   return (
     <header className="topbar">
       <Link to="/" className="logo" aria-label="EZStock 首頁">
-        <span className="logo-mark" aria-hidden="true">
-          EZ
-        </span>
+        <img className="logo-mark" src="/favicon.svg" alt="" aria-hidden="true" />
         <span className="logo-text">EZStock</span>
       </Link>
       <nav className="nav" aria-label="主選單">

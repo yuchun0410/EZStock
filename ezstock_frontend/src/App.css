@@ -49,17 +49,9 @@
 }
 
 .logo-mark {
-  display: inline-grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 6px;
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  font-family: var(--font-number);
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  display: block;
+  width: 32px;
+  height: 32px;
 }
 
 .logo-text {
