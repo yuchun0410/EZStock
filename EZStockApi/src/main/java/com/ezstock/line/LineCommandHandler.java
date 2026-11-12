@@ -3,6 +3,10 @@ package com.ezstock.line;
 import com.ezstock.dao.DailyPriceDao;
 import com.ezstock.dao.MemberDao;
 import com.ezstock.dao.StockDao;
+import com.ezstock.market.IndexQuote;
+import com.ezstock.market.InstitutionalService;
+import com.ezstock.market.MarketIndex;
+import com.ezstock.market.MarketIndexService;
 import com.ezstock.exception.BadRequestException;
 import com.ezstock.model.AlertDirection;
 import com.ezstock.model.DailyPrice;
@@ -47,6 +51,7 @@ public class LineCommandHandler {
             ・傳股票代號或名稱查股價，例如：2330、台積電、AAPL
             ・傳「資產」查淨資產（要先綁定帳號）
             ・傳「回報」看今天的每日回報（淨資產＋自選股站上月線）
+            ・傳「法人」看大盤與三大法人買賣超
             ・傳「綁定 123456」綁定網站帳號（綁定碼在網站「我的資產」頁產生）
             ・傳「提醒 2330 < 2200」收盤跌破時通知；「提醒 2330 > 2500」突破時通知
             ・傳「提醒」看所有提醒；「刪除提醒 1」刪掉第 1 個
@@ -63,11 +68,15 @@ public class LineCommandHandler {
     private final LineMessageFormatter formatter;
     private final LineDailyReportService reportService;
     private final PriceAlertService alertService;
+    private final InstitutionalService institutionalService;
+    private final MarketIndexService marketIndexService;
     private final Clock clock;
 
     public LineCommandHandler(StockDao stockDao, DailyPriceDao dailyPriceDao, LineBindingService bindingService,
                               MemberDao memberDao, AssetService assetService, LineMessageFormatter formatter,
-                              LineDailyReportService reportService, PriceAlertService alertService, Clock clock) {
+                              LineDailyReportService reportService, PriceAlertService alertService,
+                              InstitutionalService institutionalService, MarketIndexService marketIndexService,
+                              Clock clock) {
         this.stockDao = stockDao;
         this.dailyPriceDao = dailyPriceDao;
         this.bindingService = bindingService;
@@ -76,6 +85,8 @@ public class LineCommandHandler {
         this.formatter = formatter;
         this.reportService = reportService;
         this.alertService = alertService;
+        this.institutionalService = institutionalService;
+        this.marketIndexService = marketIndexService;
         this.clock = clock;
     }
 
@@ -103,6 +114,14 @@ public class LineCommandHandler {
             }
             log.info("[LINE] 會員 id={} 手動查詢每日回報", member.get().getId());
             return reportService.build(member.get());
+        }
+        if (input.equals("法人") || input.equals("三大法人")) {
+            // 不用綁定：這是整體市場的資料，跟個人無關
+            log.info("[LINE] 使用者 {} 查詢三大法人", LineMessagingClient.mask(userId));
+            IndexQuote taiex = marketIndexService.all().stream()
+                    .filter(quote -> MarketIndex.TAIEX.code().equals(quote.code()))
+                    .findFirst().orElse(null);
+            return List.of(formatter.institutionalReport(institutionalService.latest(), taiex));
         }
         Matcher alert = ALERT.matcher(input);
         if (alert.matches()) {
