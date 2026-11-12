@@ -1,73 +1,67 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router'
 import { Area, AreaChart, ResponsiveContainer, YAxis } from 'recharts'
-import { getPrices } from '../api/stockApi'
-import { currencyPrefix, formatPrice, formatSigned, minusMonths, toIsoDate, trendClass } from '../utils/format'
+import { getMarketIndices } from '../api/marketApi'
+import { formatPrice, formatSigned, trendClass } from '../utils/format'
 import { CHART_COLORS } from './chartConfig'
 
 /**
- * 首頁上方的市場概況：台股、美股各兩個代表性標的，最新收盤、當天漲跌與近三個月走勢。
- * 用 ETF 代表大盤（0050 ≈ 台股大盤、SPY ≈ S&P 500、QQQ ≈ 那斯達克 100），資料來源跟個股一樣，不用另外的 API。
+ * 首頁上方的市場概況：台股加權指數，加上美股三大指數（道瓊、S&P 500、那斯達克）。
+ * 後端一次回傳四個指數（記憶體快取 30 分鐘），每格顯示最新收盤、跟前一天比的漲跌、近三個月走勢。
+ * 指數不是股票，沒有個股頁，所以卡片不能點。
  */
-const MARKET_TILES = [
-  { stockId: '0050', name: '台灣 50', note: '台股大盤' },
-  { stockId: '2330', name: '台積電', note: '權值股' },
-  { stockId: 'SPY', name: 'S&P 500', note: 'SPY' },
-  { stockId: 'QQQ', name: '那斯達克 100', note: 'QQQ' },
-]
-
 function MarketOverview() {
-  return (
-    <section className="market-overview" aria-label="市場概況">
-      {MARKET_TILES.map((tile) => (
-        <MarketTile key={tile.stockId} tile={tile} />
-      ))}
-    </section>
-  )
-}
-
-function MarketTile({ tile }) {
-  const [state, setState] = useState({ status: 'loading', points: [] })
+  const [state, setState] = useState({ status: 'loading', quotes: [] })
 
   useEffect(() => {
     let ignore = false
-    const today = toIsoDate(new Date())
-    getPrices(tile.stockId, minusMonths(today, 3), today)
-      .then((prices) => {
-        if (!ignore) setState({ status: 'done', points: prices.map((p) => ({ date: p.date, close: Number(p.close) })) })
+    getMarketIndices()
+      .then((quotes) => {
+        if (!ignore) setState({ status: 'done', quotes })
       })
       .catch((error) => {
-        // 市場概況只是輔助資訊，一格抓不到不影響其他格
-        console.warn(`[首頁] 市場概況 ${tile.stockId} 載入失敗：${error.message}`)
-        if (!ignore) setState({ status: 'error', points: [] })
+        // 市場概況只是輔助資訊，抓不到不影響首頁其他區塊
+        console.warn(`[首頁] 市場概況載入失敗：${error.message}`)
+        if (!ignore) setState({ status: 'error', quotes: [] })
       })
     return () => {
       ignore = true
     }
-  }, [tile.stockId])
+  }, [])
 
-  const { points } = state
-  const last = points.at(-1)?.close
-  const previous = points.at(-2)?.close
-  const changePercent = previous ? ((last - previous) / previous) * 100 : null
-  const trend = trendClass(changePercent)
-  const color = trend === 'up' ? CHART_COLORS.up : trend === 'down' ? CHART_COLORS.down : CHART_COLORS.flat
-  const gradientId = `market-${tile.stockId}`
+  if (state.status === 'error') return null
 
   return (
-    <Link to={`/stocks/${tile.stockId}`} className={`market-tile ${trend}`} aria-busy={state.status === 'loading'}>
+    <section className="market-overview" aria-label="市場概況" aria-busy={state.status === 'loading'}>
+      {state.status === 'loading'
+        ? [0, 1, 2, 3].map((i) => <div key={i} className="market-tile is-loading" aria-hidden="true" />)
+        : state.quotes.map((quote) => <MarketTile key={quote.code} quote={quote} />)}
+    </section>
+  )
+}
+
+function MarketTile({ quote }) {
+  const trend = trendClass(quote.change)
+  const color = trend === 'up' ? CHART_COLORS.up : trend === 'down' ? CHART_COLORS.down : CHART_COLORS.flat
+  const gradientId = `market-${quote.code.replace(/\W/g, '')}`
+  const points = quote.points.map((p) => ({ date: p.date, close: Number(p.close) }))
+
+  return (
+    <div className={`market-tile ${trend}`}>
       <div className="market-tile-head">
-        <span className="market-tile-name">{tile.name}</span>
-        <span className="muted">{tile.note}</span>
+        <span className="market-tile-name">{quote.name}</span>
+        <span className="muted">{quote.note}</span>
       </div>
-      {state.status === 'error' && <div className="market-tile-empty muted">暫時無法顯示</div>}
-      {state.status !== 'error' && (
+      {quote.close == null ? (
+        <div className="market-tile-empty muted">暫時無法顯示</div>
+      ) : (
         <>
           <div className="market-tile-price">
-            <span className="market-tile-close">{last == null ? '—' : currencyPrefix(tile.stockId) + formatPrice(last)}</span>
-            <span className={`market-tile-change ${trend}`}>
-              {changePercent == null ? '' : `${formatSigned(changePercent)}%`}
-            </span>
+            <span className="market-tile-close">{formatPrice(quote.close)}</span>
+            {quote.change != null && (
+              <span className={`market-tile-change ${trend}`}>
+                {formatSigned(quote.change)}（{formatSigned(quote.changePercent)}%）
+              </span>
+            )}
           </div>
           <div className="market-tile-chart" aria-hidden="true">
             {points.length >= 2 && (
@@ -92,9 +86,10 @@ function MarketTile({ tile }) {
               </ResponsiveContainer>
             )}
           </div>
+          <div className="market-tile-date muted">{quote.date} 收盤</div>
         </>
       )}
-    </Link>
+    </div>
   )
 }
 

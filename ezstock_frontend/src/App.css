@@ -1980,3 +1980,117 @@
   width: 17px;
   height: 17px;
 }
+
+/* 市場概況：指數卡片不能點，不需要 hover 效果；載入中先佔位，避免版面跳動 */
+.market-tile.is-loading {
+  height: 128px;
+  background: var(--color-sunken);
+}
+
+.market-tile-date {
+  padding: 2px 0 8px;
+  font-size: 0.72rem;
+}
+
+.market-tile:not(a):hover {
+  border-color: var(--color-border);
+}
+
+/* =========================================================
+ * 首頁：三大法人買賣超
+ * 長條往右延伸，長度代表金額；買超紅、賣超綠，跟漲跌同一套顏色
+ * ========================================================= */
+.institutional.is-loading {
+  height: 180px;
+}
+
+.institutional-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.institutional-head .section-title {
+  margin-bottom: 12px;
+}
+
+.institutional-head .muted {
+  font-size: 0.8rem;
+}
+
+.institutional-rows {
+  margin: 0;
+}
+
+.institutional-row {
+  display: grid;
+  grid-template-columns: 4.5em 1fr 9em;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.institutional-row:last-child {
+  border-bottom: none;
+}
+
+.institutional-row.is-total {
+  font-weight: 700;
+}
+
+.institutional-row dt {
+  font-weight: 600;
+}
+
+.institutional-row dd {
+  margin: 0;
+}
+
+.institutional-bar-cell {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--color-sunken);
+  overflow: hidden;
+}
+
+.institutional-row.is-total .institutional-bar-cell {
+  background: none;
+}
+
+.institutional-bar {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+
+.institutional-bar.up {
+  background: var(--color-up);
+}
+
+.institutional-bar.down {
+  background: var(--color-down);
+}
+
+.institutional-net {
+  text-align: right;
+  font-family: var(--font-number);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.institutional-label {
+  margin-left: 6px;
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+@media (max-width: 560px) {
+  .institutional-row {
+    grid-template-columns: 4em 1fr 7.5em;
+    gap: 8px;
+  }
+}
