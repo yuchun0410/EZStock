@@ -2,6 +2,7 @@ package com.ezstock.datasource.finmind;
 
 import com.ezstock.datasource.CashDividend;
 import com.ezstock.datasource.ExchangeRate;
+import com.ezstock.datasource.InstitutionalTrade;
 import com.ezstock.datasource.NewsItem;
 import com.ezstock.datasource.PriceBar;
 import com.ezstock.datasource.ShareSplit;
@@ -257,6 +258,26 @@ class FinMindDataSourceTest {
         assertThat(rates).extracting(ExchangeRate::date)
                 .containsExactly(LocalDate.of(2026, 11, 6), LocalDate.of(2026, 11, 9));
         assertThat(rates.get(1).mid()).isEqualByComparingTo("32.89");
+    }
+
+    @Test
+    @DisplayName("三大法人：不帶股票代號，轉換買進、賣出金額")
+    void fetchInstitutionalTrades() {
+        setUp("my-token");
+        server.expect(queryParam("dataset", "TaiwanStockTotalInstitutionalInvestors"))
+                .andExpect(queryParam("start_date", "2026-11-02"))
+                .andRespond(withSuccess("""
+                        {"msg":"success","status":200,"data":[
+                          {"buy":386091795543,"date":"2026-11-10","name":"Foreign_Investor","sell":420208485449},
+                          {"buy":50364151226,"date":"2026-11-10","name":"Investment_Trust","sell":10473083709}
+                        ]}""", MediaType.APPLICATION_JSON));
+
+        List<InstitutionalTrade> trades = dataSource.fetchInstitutionalTrades(LocalDate.of(2026, 11, 2), LocalDate.of(2026, 11, 12));
+
+        server.verify();
+        assertThat(trades).hasSize(2);
+        assertThat(trades.get(0).investor()).isEqualTo("Foreign_Investor");
+        assertThat(trades.get(0).buy()).isEqualByComparingTo("386091795543");
     }
 
     @Test

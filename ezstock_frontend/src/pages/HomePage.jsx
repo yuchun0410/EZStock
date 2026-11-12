@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import InstitutionalFlow from '../components/InstitutionalFlow'
 import MarketOverview from '../components/MarketOverview'
 import NewsList from '../components/NewsList'
 import WatchlistCard from '../components/WatchlistCard'
@@ -113,6 +114,8 @@ function HomePage() {
       </section>
 
       {!keyword && <MarketOverview />}
+
+      {!keyword && <InstitutionalFlow />}
 
       {!keyword && (
         <div className="home-grid">

@@ -2,6 +2,7 @@ package com.ezstock.datasource.finmind;
 
 import com.ezstock.datasource.CashDividend;
 import com.ezstock.datasource.ExchangeRate;
+import com.ezstock.datasource.InstitutionalTrade;
 import com.ezstock.datasource.MarketDataSource;
 import com.ezstock.datasource.NewsItem;
 import com.ezstock.datasource.PriceBar;
@@ -289,6 +290,22 @@ public class FinMindDataSource implements MarketDataSource {
                     splits.stream().map(s -> s.date() + " " + s.type()).toList());
         }
         return splits;
+    }
+
+    /** 整體市場三大法人買賣金額（FinMind 的 TaiwanStockTotalInstitutionalInvestors），資料不完整的略過 */
+    @Override
+    public List<InstitutionalTrade> fetchInstitutionalTrades(LocalDate from, LocalDate to) {
+        List<FinMindDto.InstitutionalRow> rows = call("TaiwanStockTotalInstitutionalInvestors", null, from, to,
+                new ParameterizedTypeReference<FinMindDto.Response<FinMindDto.InstitutionalRow>>() {
+                });
+        List<InstitutionalTrade> trades = new ArrayList<>();
+        for (FinMindDto.InstitutionalRow row : rows) {
+            if (row.date() == null || row.name() == null || row.buy() == null || row.sell() == null) {
+                continue;
+            }
+            trades.add(new InstitutionalTrade(LocalDate.parse(row.date()), row.name(), row.buy(), row.sell()));
+        }
+        return trades;
     }
 
     /**
