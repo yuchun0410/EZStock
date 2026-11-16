@@ -4,13 +4,16 @@ import com.ezstock.config.RequestLoggingFilter;
 import com.ezstock.dto.AuthProvidersResponse;
 import com.ezstock.dto.GoogleLoginRequest;
 import com.ezstock.dto.LoginRequest;
+import com.ezstock.dto.MemberResponse;
 import com.ezstock.dto.RegisterRequest;
 import com.ezstock.dto.TokenResponse;
+import com.ezstock.dto.VerifyEmailRequest;
 import com.ezstock.exception.ApiError;
 import com.ezstock.exception.UnauthorizedException;
 import com.ezstock.security.RefreshTokenCookies;
 import com.ezstock.service.AuthService;
 import com.ezstock.service.AuthService.AuthResult;
+import com.ezstock.service.EmailVerificationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -42,10 +45,13 @@ public class AuthController {
     private static final String BEARER = "Bearer ";
 
     private final AuthService authService;
+    private final EmailVerificationService emailVerificationService;
     private final RefreshTokenCookies cookies;
 
-    public AuthController(AuthService authService, RefreshTokenCookies cookies) {
+    public AuthController(AuthService authService, EmailVerificationService emailVerificationService,
+                          RefreshTokenCookies cookies) {
         this.authService = authService;
+        this.emailVerificationService = emailVerificationService;
         this.cookies = cookies;
     }
 
@@ -67,6 +73,15 @@ public class AuthController {
     @PostMapping("/google")
     public ResponseEntity<TokenResponse> google(@Valid @RequestBody GoogleLoginRequest request) {
         return withTokens(HttpStatus.OK, authService.loginWithGoogle(request.credential()));
+    }
+
+    /**
+     * 點了驗證信的連結：前端的驗證頁把網址上的 token 送來。不用登入，在別的裝置打開信也能驗證。
+     * 用 POST 不用 GET：信箱的連結預覽、防毒掃描會自動打開 GET 連結，可能在使用者沒點之前就把 token 用掉。
+     */
+    @PostMapping("/verify-email")
+    public MemberResponse verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        return emailVerificationService.verify(request.token());
     }
 
     /** 登入頁要顯示哪些登入方式（例如有沒有 Google 按鈕、用哪個用戶端 ID） */

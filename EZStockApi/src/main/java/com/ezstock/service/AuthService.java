@@ -9,7 +9,7 @@ import com.ezstock.security.LineLoginUser;
 
 public interface AuthService {
 
-    /** 註冊並直接登入 */
+    /** 註冊並直接登入，同時寄出 Email 驗證信 */
     AuthResult register(RegisterRequest request);
 
     /** clientIp 用來限制同一個 IP 的登入失敗次數 */

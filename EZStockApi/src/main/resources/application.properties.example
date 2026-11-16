@@ -50,6 +50,11 @@ ezstock.line-login.channel-id=
 # 要跟 LINE Login channel → LINE Login 分頁的 Callback URL 完全一樣
 ezstock.line-login.redirect-uri=http://localhost:5173/login/line/callback
 
+# ---------- Email 驗證 ----------
+# 驗證信裡的連結導到前端的哪一頁（後面會接 ?token=…）。還沒接寄信服務，信不會真的寄出，
+# 驗證連結會印在 logs/ezstock.log，搜尋「[Email]」
+ezstock.email.verify-url=http://localhost:5173/verify-email
+
 finmind.api.url=https://api.finmindtrade.com/api/v4/data
 finmind.api.token=YOUR_FINMIND_TOKEN
 

@@ -21,6 +21,7 @@ import com.ezstock.security.LoginAttemptLimiter;
 import com.ezstock.security.RefreshTokenStore;
 import com.ezstock.security.TokenService;
 import com.ezstock.service.AuthService;
+import com.ezstock.service.EmailVerificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -56,6 +57,7 @@ public class AuthServiceImpl implements AuthService {
     private final GoogleIdTokenVerifier googleVerifier;
     private final LoginAttemptLimiter loginLimiter;
     private final LineLoginProperties lineLoginProperties;
+    private final EmailVerificationService emailVerificationService;
     private final Clock clock;
 
     /** Email 不存在時也跑一次 BCrypt，讓回應時間跟「密碼錯」差不多，避免用時間差猜出帳號存不存在 */
@@ -64,7 +66,8 @@ public class AuthServiceImpl implements AuthService {
     public AuthServiceImpl(MemberDao memberDao, PasswordEncoder passwordEncoder, TokenService tokenService,
                            RefreshTokenStore refreshTokenStore, AccessTokenBlacklist blacklist,
                            JwtDecoder jwtDecoder, GoogleIdTokenVerifier googleVerifier,
-                           LoginAttemptLimiter loginLimiter, LineLoginProperties lineLoginProperties, Clock clock) {
+                           LoginAttemptLimiter loginLimiter, LineLoginProperties lineLoginProperties,
+                           EmailVerificationService emailVerificationService, Clock clock) {
         this.memberDao = memberDao;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
@@ -74,6 +77,7 @@ public class AuthServiceImpl implements AuthService {
         this.googleVerifier = googleVerifier;
         this.loginLimiter = loginLimiter;
         this.lineLoginProperties = lineLoginProperties;
+        this.emailVerificationService = emailVerificationService;
         this.clock = clock;
         this.dummyHash = passwordEncoder.encode("dummy-password-for-timing");
     }
@@ -101,6 +105,8 @@ public class AuthServiceImpl implements AuthService {
             throw new ConflictException("這個 Email 已經註冊過，請直接登入");
         }
         log.info("[會員] 註冊成功 id={} {}", member.getId(), LogMasks.email(email));
+        // 註冊完先直接登入，同時寄驗證信；寄信失敗不影響註冊
+        emailVerificationService.sendVerification(member);
         return issueTokens(member);
     }
 
