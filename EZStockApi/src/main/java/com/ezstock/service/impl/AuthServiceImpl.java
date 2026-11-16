@@ -165,10 +165,18 @@ public class AuthServiceImpl implements AuthService {
                     log.warn("[會員] Google 登入失敗：會員 id={} 已綁定其他 Google 帳號", member.getId());
                     throw new ConflictException("這個 Email 已經綁定另一個 Google 帳號");
                 }
-                // Google 已確認 Email 屬於本人，所以可以綁定同 Email 的既有帳號。
-                // 注意：目前註冊沒有驗證 Email，有人可能先用別人的 Email 註冊。之後要加「註冊寄驗證信」補上這個洞。
-                member.linkGoogle(google.subject(), google.pictureUrl());
-                log.info("[會員] 既有會員 id={} 綁定 Google 帳號", member.getId());
+                if (member.isEmailVerified()) {
+                    // Email 已經驗證過，確定是同一個人，直接綁定，密碼保留
+                    member.linkGoogle(google.subject(), google.pictureUrl());
+                    log.info("[會員] 既有會員 id={} 綁定 Google 帳號", member.getId());
+                } else {
+                    // Email 還沒驗證：可能是別人先用這個 Email 註冊。Google 證明了現在這個人才是 Email 的主人，
+                    // 所以由他接管帳號：清掉原本的密碼，並登出其他裝置，冒用者就不能再登入
+                    member.claimByGoogle(google.subject(), google.pictureUrl(), now);
+                    refreshTokenStore.revokeAll(member.getId());
+                    log.warn("[會員] 會員 id={} 的 Email 尚未驗證，由同 Email 的 Google 帳號接管（清除密碼、登出其他裝置）",
+                            member.getId());
+                }
             } else {
                 member = Member.withGoogle(google.email(), google.subject(), displayNameOf(google),
                         google.pictureUrl(), now);
@@ -190,8 +198,8 @@ public class AuthServiceImpl implements AuthService {
 
     /**
      * LINE 登入。
-     * 為什麼不像 Google 一樣，用 Email 自動綁定既有帳號：LINE 不保證 Email 有驗證過，我們的註冊目前也沒有驗證 Email，
-     * 如果有人先用別人的 Email 註冊、或 LINE 帳號填了別人的 Email，自動綁定就等於讓他登入別人的帳號。
+     * 為什麼不像 Google 一樣，用 Email 自動綁定既有帳號：LINE 不保證 Email 有驗證過，
+     * 如果 LINE 帳號填了別人的 Email，自動綁定就等於讓他登入別人的帳號。
      * 所以 Email 已經被註冊時回 409，請使用者先用原本的方式登入，在「我的資產」用綁定碼綁 LINE，之後就能用 LINE 登入
      * （LINE Login 和 LINE Bot 在同一個 provider 底下，兩邊的使用者 id 一樣）。
      */

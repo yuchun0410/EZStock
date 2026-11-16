@@ -264,9 +264,10 @@ class AuthServiceImplTest {
     }
 
     @Test
-    @DisplayName("Google 登入：同 Email 的既有會員，綁定 Google 帳號，密碼保留")
+    @DisplayName("Google 登入：同 Email、已驗證 Email 的既有會員，綁定 Google 帳號，密碼保留")
     void googleLinksExistingMember() {
         Member existing = member("a@example.com", PASSWORD);
+        existing.markEmailVerified(LocalDateTime.of(2026, 10, 1, 12, 0));
         when(memberDao.findByEmail("a@example.com")).thenReturn(Optional.of(existing));
         when(googleVerifier.verify("id-token"))
                 .thenReturn(new GoogleUser("g-sub", "a@example.com", true, "小明", "https://pic"));
@@ -275,6 +276,24 @@ class AuthServiceImplTest {
 
         assertThat(existing.getGoogleSub()).isEqualTo("g-sub");
         assertThat(existing.hasPassword()).isTrue();
+        verify(memberDao).save(existing);
+        verify(refreshTokenStore).issue(7L);
+    }
+
+    @Test
+    @DisplayName("Google 登入：同 Email 但還沒驗證 Email 的會員，由 Google 帳號接管：清除密碼、登出其他裝置")
+    void googleClaimsUnverifiedMember() {
+        Member existing = member("a@example.com", PASSWORD);
+        when(memberDao.findByEmail("a@example.com")).thenReturn(Optional.of(existing));
+        when(googleVerifier.verify("id-token"))
+                .thenReturn(new GoogleUser("g-sub", "a@example.com", true, "小明", "https://pic"));
+
+        service.loginWithGoogle("id-token");
+
+        assertThat(existing.getGoogleSub()).isEqualTo("g-sub");
+        assertThat(existing.hasPassword()).as("冒用者設的密碼不能再用").isFalse();
+        assertThat(existing.isEmailVerified()).isTrue();
+        verify(refreshTokenStore).revokeAll(7L);
         verify(memberDao).save(existing);
         verify(refreshTokenStore).issue(7L);
     }
