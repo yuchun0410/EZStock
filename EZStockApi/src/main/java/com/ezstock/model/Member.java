@@ -22,6 +22,10 @@ public class Member {
     @Column(unique = true, length = 254)
     private String email;
 
+    /** Email 驗證的時間；null 代表還沒驗證（或沒有 Email） */
+    @Column(name = "email_verified_at")
+    private LocalDateTime emailVerifiedAt;
+
     @Column(name = "password_hash", length = 100)
     private String passwordHash;
 
@@ -62,10 +66,12 @@ public class Member {
         return new Member(email, passwordHash, null, displayName, null, now);
     }
 
-    /** 第一次用 Google 登入，自動建立的會員（沒有密碼） */
+    /** 第一次用 Google 登入，自動建立的會員（沒有密碼）。Google 已經驗證過 Email，所以直接算已驗證 */
     public static Member withGoogle(String email, String googleSub, String displayName, String avatarUrl,
                                     LocalDateTime now) {
-        return new Member(email, null, googleSub, displayName, avatarUrl, now);
+        Member member = new Member(email, null, googleSub, displayName, avatarUrl, now);
+        member.emailVerifiedAt = now;
+        return member;
     }
 
     /**
@@ -95,6 +101,27 @@ public class Member {
         }
     }
 
+    /**
+     * 還沒驗證 Email 的帳號，被同一個 Email 的 Google 帳號登入：Google 證明了這個人才是 Email 的主人。
+     * 原本的密碼可能是別人冒用這個 Email 註冊時設的，所以清掉，之後只能用 Google 登入（或重新設定密碼）。
+     */
+    public void claimByGoogle(String googleSub, String avatarUrl, LocalDateTime now) {
+        linkGoogle(googleSub, avatarUrl);
+        this.passwordHash = null;
+        this.emailVerifiedAt = now;
+    }
+
+    /** 點了驗證信的連結；已經驗證過就保留第一次的時間 */
+    public void markEmailVerified(LocalDateTime time) {
+        if (this.emailVerifiedAt == null) {
+            this.emailVerifiedAt = time;
+        }
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerifiedAt != null;
+    }
+
     public void linkLine(String lineUserId) {
         this.lineUserId = lineUserId;
     }
@@ -113,6 +140,7 @@ public class Member {
 
     public Long getId() { return id; }
     public String getEmail() { return email; }
+    public LocalDateTime getEmailVerifiedAt() { return emailVerifiedAt; }
     public String getPasswordHash() { return passwordHash; }
     public String getGoogleSub() { return googleSub; }
     public String getLineUserId() { return lineUserId; }
