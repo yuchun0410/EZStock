@@ -3,6 +3,7 @@ package com.ezstock.controller;
 import com.ezstock.config.RequestLoggingFilter;
 import com.ezstock.dto.MemberResponse;
 import com.ezstock.exception.GlobalExceptionHandler;
+import com.ezstock.exception.BadRequestException;
 import com.ezstock.exception.TooManyRequestsException;
 import com.ezstock.exception.UnauthorizedException;
 import com.ezstock.security.AccessToken;
@@ -10,6 +11,7 @@ import com.ezstock.security.JwtProperties;
 import com.ezstock.security.RefreshTokenCookies;
 import com.ezstock.service.AuthService;
 import com.ezstock.service.AuthService.AuthResult;
+import com.ezstock.service.EmailVerificationService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,13 +43,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AuthControllerTest {
 
     private AuthService authService;
+    private EmailVerificationService emailVerificationService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         authService = mock(AuthService.class);
+        emailVerificationService = mock(EmailVerificationService.class);
         RefreshTokenCookies cookies = new RefreshTokenCookies(new JwtProperties(null, null, null, null, false));
-        mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(authService, cookies))
+        mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(authService, emailVerificationService, cookies))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .addFilters(new RequestLoggingFilter())
                 .build();
@@ -71,6 +75,28 @@ class AuthControllerTest {
                         containsString("SameSite=Strict"),
                         containsString("Path=/api/auth"),
                         containsString("Max-Age=604800"))));
+    }
+
+    @Test
+    @DisplayName("驗證 Email：token 正確回會員資料；token 無效回 400；沒帶 token 回 400，不會呼叫 service")
+    void verifyEmail() throws Exception {
+        when(emailVerificationService.verify("good-token")).thenReturn(result().member());
+        when(emailVerificationService.verify("bad-token")).thenThrow(new BadRequestException("驗證連結無效或已過期"));
+
+        mockMvc.perform(post("/api/auth/verify-email").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"good-token\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("a@example.com"))
+                .andExpect(jsonPath("$.emailVerified").value(true));
+
+        mockMvc.perform(post("/api/auth/verify-email").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"bad-token\"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/auth/verify-email").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"\"}"))
+                .andExpect(status().isBadRequest());
+        verify(emailVerificationService, never()).verify("");
     }
 
     @Test
@@ -152,7 +178,7 @@ class AuthControllerTest {
 
     private AuthResult result() {
         MemberResponse member = new MemberResponse(1L, "a@example.com", "小明", null, true, false, false,
-                LocalDateTime.of(2026, 10, 29, 14, 0));
+                LocalDateTime.of(2026, 10, 29, 14, 0), true);
         return new AuthResult(new AccessToken("jwt-value", "jti", Instant.now().plusSeconds(900)),
                 "refresh-value", member);
     }

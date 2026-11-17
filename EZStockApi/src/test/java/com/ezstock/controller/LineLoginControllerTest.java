@@ -120,7 +120,7 @@ class LineLoginControllerTest {
 
     private AuthResult result() {
         MemberResponse member = new MemberResponse(1L, null, "小明", null, false, false, true,
-                LocalDateTime.of(2026, 11, 10, 12, 0));
+                LocalDateTime.of(2026, 11, 10, 12, 0), false);
         return new AuthResult(new AccessToken("jwt-value", "jti", Instant.now().plusSeconds(900)), "refresh-value", member);
     }
 }

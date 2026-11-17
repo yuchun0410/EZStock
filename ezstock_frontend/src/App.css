@@ -893,6 +893,26 @@
   min-height: 44px;
 }
 
+/* 還沒驗證 Email 的提醒，每一頁上方 */
+.verify-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.verify-banner .verify-resend {
+  margin-top: 0;
+  white-space: nowrap;
+}
+
+.verify-banner .verify-resend:disabled {
+  color: var(--color-muted);
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
 .auth-switch {
   margin: 20px 0 0;
   text-align: center;

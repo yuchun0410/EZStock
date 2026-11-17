@@ -37,6 +37,14 @@ export function setSession(tokenResponse) {
   emit()
 }
 
+/** 會員資料有變（例如剛驗證完 Email）；只有已登入、而且是同一個會員時才更新 */
+export function updateMember(member) {
+  if (state.status === 'authenticated' && state.member?.id === member.id) {
+    state = { ...state, member }
+    emit()
+  }
+}
+
 export function clearSession() {
   accessToken = null
   if (state.status !== 'anonymous' || state.member !== null) {

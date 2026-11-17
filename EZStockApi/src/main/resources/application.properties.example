@@ -50,6 +50,21 @@ ezstock.line-login.channel-id=
 # 要跟 LINE Login channel → LINE Login 分頁的 Callback URL 完全一樣
 ezstock.line-login.redirect-uri=http://localhost:5173/login/line/callback
 
+# ---------- Email 驗證 ----------
+# 驗證信裡的連結導到前端的哪一頁（後面會接 ?token=…）。沒設定 Mailjet 時信不會真的寄出，
+# 驗證連結會印在 logs/ezstock.log，搜尋「[Email]」
+ezstock.email.verify-url=http://localhost:5173/verify-email
+# 想在本機真的寄信，二選一（都沒填就寫進 log）：
+# 1. Google Apps Script：網址（…/exec）和密語（跟指令碼屬性 SECRET 一樣），用自己的 Gmail 寄出（推薦）
+# 2. Mailjet：金鑰（https://app.mailjet.com/account/apikeys）和驗證過的寄件人
+# 密語、Secret Key 都不要 commit
+ezstock.email.apps-script.url=
+ezstock.email.apps-script.secret=
+ezstock.email.from=
+ezstock.email.from-name=EZStock
+ezstock.email.mailjet.api-key=
+ezstock.email.mailjet.secret-key=
+
 finmind.api.url=https://api.finmindtrade.com/api/v4/data
 finmind.api.token=YOUR_FINMIND_TOKEN
 

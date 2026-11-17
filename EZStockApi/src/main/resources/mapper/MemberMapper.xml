@@ -6,6 +6,7 @@
     <resultMap id="memberMap" type="Member">
         <id     property="id"           column="id"/>
         <result property="email"        column="email"/>
+        <result property="emailVerifiedAt" column="email_verified_at"/>
         <result property="passwordHash" column="password_hash"/>
         <result property="googleSub"    column="google_sub"/>
         <result property="lineUserId"   column="line_user_id"/>
@@ -16,7 +17,7 @@
     </resultMap>
 
     <sql id="columns">
-        id, email, password_hash, google_sub, line_user_id, display_name, avatar_url, created_at, last_login_at
+        id, email, email_verified_at, password_hash, google_sub, line_user_id, display_name, avatar_url, created_at, last_login_at
     </sql>
 
     <select id="findById" resultMap="memberMap">
@@ -40,16 +41,17 @@
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
-        INSERT INTO member (email, password_hash, google_sub, line_user_id, display_name, avatar_url, created_at,
-                            last_login_at)
-        VALUES (#{email}, #{passwordHash}, #{googleSub}, #{lineUserId}, #{displayName}, #{avatarUrl}, #{createdAt},
-                #{lastLoginAt})
+        INSERT INTO member (email, email_verified_at, password_hash, google_sub, line_user_id, display_name,
+                            avatar_url, created_at, last_login_at)
+        VALUES (#{email}, #{emailVerifiedAt}, #{passwordHash}, #{googleSub}, #{lineUserId}, #{displayName},
+                #{avatarUrl}, #{createdAt}, #{lastLoginAt})
     </insert>
 
     <!-- Email 和建立時間不會變，不更新 -->
     <update id="update">
         UPDATE member
-        SET password_hash = #{passwordHash},
+        SET email_verified_at = #{emailVerifiedAt},
+            password_hash = #{passwordHash},
             google_sub    = #{googleSub},
             line_user_id  = #{lineUserId},
             display_name  = #{displayName},

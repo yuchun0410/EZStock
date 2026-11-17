@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router'
+import EmailVerifyBanner from './components/EmailVerifyBanner'
 import Header from './components/Header'
 import AssetPage from './pages/AssetPage'
 import ForumPage from './pages/ForumPage'
@@ -13,6 +14,7 @@ import PostEditorPage from './pages/PostEditorPage'
 import PostPage from './pages/PostPage'
 import RegisterPage from './pages/RegisterPage'
 import ScreenerPage from './pages/ScreenerPage'
+import VerifyEmailPage from './pages/VerifyEmailPage'
 import './App.css'
 
 function App() {
@@ -20,6 +22,7 @@ function App() {
     <div className="app-shell">
       <Header />
       <main className="main">
+        <EmailVerifyBanner />
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/stocks/:stockId" element={<StockPage />} />
@@ -34,6 +37,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/login/line/callback" element={<LineCallbackPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>

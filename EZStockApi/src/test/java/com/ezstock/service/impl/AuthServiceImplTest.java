@@ -18,6 +18,7 @@ import com.ezstock.security.LoginAttemptLimiter;
 import com.ezstock.security.RefreshTokenStore;
 import com.ezstock.security.TokenService;
 import com.ezstock.service.AuthService.AuthResult;
+import com.ezstock.service.EmailVerificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -64,6 +65,7 @@ class AuthServiceImplTest {
     private JwtDecoder jwtDecoder;
     private GoogleIdTokenVerifier googleVerifier;
     private LoginAttemptLimiter loginLimiter;
+    private EmailVerificationService emailVerificationService;
     private AuthServiceImpl service;
 
     @BeforeEach
@@ -75,9 +77,11 @@ class AuthServiceImplTest {
         jwtDecoder = mock(JwtDecoder.class);
         googleVerifier = mock(GoogleIdTokenVerifier.class);
         loginLimiter = mock(LoginAttemptLimiter.class);
+        emailVerificationService = mock(EmailVerificationService.class);
         Clock clock = Clock.fixed(NOW, ZoneId.of("Asia/Taipei"));
         service = new AuthServiceImpl(memberDao, encoder, tokenService, refreshTokenStore, blacklist, jwtDecoder,
-                googleVerifier, loginLimiter, new LineLoginProperties("channel-id", "secret", "http://localhost/cb"), clock);
+                googleVerifier, loginLimiter, new LineLoginProperties("channel-id", "secret", "http://localhost/cb"),
+                emailVerificationService, clock);
 
         when(memberDao.findByEmail(anyString())).thenReturn(Optional.empty());
         when(memberDao.findByGoogleSub(anyString())).thenReturn(Optional.empty());
@@ -93,7 +97,7 @@ class AuthServiceImplTest {
     }
 
     @Test
-    @DisplayName("註冊：Email 轉小寫、密碼存 BCrypt 雜湊，並直接登入")
+    @DisplayName("註冊：Email 轉小寫、密碼存 BCrypt 雜湊，尚未驗證 Email，寄出驗證信並直接登入")
     void register() {
         AuthResult result = service.register(new RegisterRequest("New@Example.com", PASSWORD, " 小明 "));
 
@@ -105,6 +109,8 @@ class AuthServiceImplTest {
         assertThat(member.getPasswordHash()).isNotEqualTo(PASSWORD).startsWith("$2a$");
         assertThat(encoder.matches(PASSWORD, member.getPasswordHash())).isTrue();
         assertThat(member.getLastLoginAt()).isNotNull();
+        assertThat(member.isEmailVerified()).isFalse();
+        verify(emailVerificationService).sendVerification(member);
 
         assertThat(result.accessToken().value()).isEqualTo("jwt");
         assertThat(result.refreshToken()).isEqualTo("refresh-1");
@@ -258,9 +264,10 @@ class AuthServiceImplTest {
     }
 
     @Test
-    @DisplayName("Google 登入：同 Email 的既有會員，綁定 Google 帳號，密碼保留")
+    @DisplayName("Google 登入：同 Email、已驗證 Email 的既有會員，綁定 Google 帳號，密碼保留")
     void googleLinksExistingMember() {
         Member existing = member("a@example.com", PASSWORD);
+        existing.markEmailVerified(LocalDateTime.of(2026, 10, 1, 12, 0));
         when(memberDao.findByEmail("a@example.com")).thenReturn(Optional.of(existing));
         when(googleVerifier.verify("id-token"))
                 .thenReturn(new GoogleUser("g-sub", "a@example.com", true, "小明", "https://pic"));
@@ -269,6 +276,24 @@ class AuthServiceImplTest {
 
         assertThat(existing.getGoogleSub()).isEqualTo("g-sub");
         assertThat(existing.hasPassword()).isTrue();
+        verify(memberDao).save(existing);
+        verify(refreshTokenStore).issue(7L);
+    }
+
+    @Test
+    @DisplayName("Google 登入：同 Email 但還沒驗證 Email 的會員，由 Google 帳號接管：清除密碼、登出其他裝置")
+    void googleClaimsUnverifiedMember() {
+        Member existing = member("a@example.com", PASSWORD);
+        when(memberDao.findByEmail("a@example.com")).thenReturn(Optional.of(existing));
+        when(googleVerifier.verify("id-token"))
+                .thenReturn(new GoogleUser("g-sub", "a@example.com", true, "小明", "https://pic"));
+
+        service.loginWithGoogle("id-token");
+
+        assertThat(existing.getGoogleSub()).isEqualTo("g-sub");
+        assertThat(existing.hasPassword()).as("冒用者設的密碼不能再用").isFalse();
+        assertThat(existing.isEmailVerified()).isTrue();
+        verify(refreshTokenStore).revokeAll(7L);
         verify(memberDao).save(existing);
         verify(refreshTokenStore).issue(7L);
     }

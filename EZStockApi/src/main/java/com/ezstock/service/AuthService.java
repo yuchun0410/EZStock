@@ -9,7 +9,7 @@ import com.ezstock.security.LineLoginUser;
 
 public interface AuthService {
 
-    /** 註冊並直接登入 */
+    /** 註冊並直接登入，同時寄出 Email 驗證信 */
     AuthResult register(RegisterRequest request);
 
     /** clientIp 用來限制同一個 IP 的登入失敗次數 */
@@ -17,6 +17,7 @@ public interface AuthService {
 
     /**
      * Google 登入：用 Google 帳號編號找會員；找不到就用 Email 找，找到就綁定；都沒有就建立新會員。
+     * 同 Email 的既有帳號還沒驗證 Email 時，由 Google 帳號接管（清除密碼），見實作的說明。
      *
      * @param credential 前端 Google 按鈕拿到的 ID Token
      */

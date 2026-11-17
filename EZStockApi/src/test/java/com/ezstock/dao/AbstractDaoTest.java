@@ -212,7 +212,7 @@ abstract class AbstractDaoTest {
     }
 
     @Test
-    @DisplayName("會員：新增後拿到 id，Email 不分大小寫，綁定 Google 與登入時間可以更新")
+    @DisplayName("會員：新增後拿到 id，Email 不分大小寫，綁定 Google、Email 驗證與登入時間可以更新")
     void member() {
         LocalDateTime now = LocalDateTime.of(2026, 10, 29, 11, 0);
         Member created = memberDao.save(Member.withPassword(" Test.User@Example.com ", "$2a$10$hash", "測試會員", now));
@@ -223,7 +223,9 @@ abstract class AbstractDaoTest {
         assertThat(found.getEmail()).isEqualTo("test.user@example.com");
         assertThat(found.hasPassword()).isTrue();
         assertThat(found.getGoogleSub()).isNull();
+        assertThat(found.isEmailVerified()).isFalse();
 
+        found.markEmailVerified(now.plusMinutes(5));
         found.linkGoogle("google-sub-123", "https://example.com/a.png");
         found.recordLogin(now.plusHours(1));
         memberDao.save(found);
@@ -232,6 +234,7 @@ abstract class AbstractDaoTest {
         assertThat(linked.getId()).isEqualTo(created.getId());
         assertThat(linked.getAvatarUrl()).isEqualTo("https://example.com/a.png");
         assertThat(linked.getLastLoginAt()).isEqualTo(now.plusHours(1));
+        assertThat(linked.getEmailVerifiedAt()).isEqualTo(now.plusMinutes(5));
         assertThat(memberDao.findById(created.getId())).isPresent();
         assertThat(memberDao.findByEmail("nobody@example.com")).isEmpty();
 
@@ -252,6 +255,7 @@ abstract class AbstractDaoTest {
         assertThat(found.getId()).isEqualTo(created.getId());
         assertThat(found.hasPassword()).isFalse();
         assertThat(found.getDisplayName()).isEqualTo("Google 會員");
+        assertThat(found.isEmailVerified()).as("Google 已驗證過 Email").isTrue();
     }
 
     @Test
