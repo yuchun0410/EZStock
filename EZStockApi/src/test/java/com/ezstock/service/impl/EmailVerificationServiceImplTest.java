@@ -49,7 +49,7 @@ class EmailVerificationServiceImplTest {
         emailSender = mock(EmailSender.class);
         Clock clock = Clock.fixed(NOW, ZoneId.of("Asia/Taipei"));
         service = new EmailVerificationServiceImpl(memberDao, tokenStore, emailSender,
-                new EmailProperties("https://ezstock.example/verify-email"), clock);
+                new EmailProperties("https://ezstock.example/verify-email", null, null, null, null), clock);
         when(tokenStore.issue(anyLong())).thenReturn("token-123");
     }
 
