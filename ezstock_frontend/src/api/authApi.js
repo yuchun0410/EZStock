@@ -1,4 +1,4 @@
-import { clearSession, setSession } from '../auth/authStore'
+import { clearSession, setSession, updateMember } from '../auth/authStore'
 import { apiGet, apiPost } from './client'
 
 /** 註冊，成功會直接登入。request：{ email, password, displayName } */
@@ -91,4 +91,21 @@ export async function logout() {
 /** 自己的會員資料（需要登入） */
 export function getMe() {
   return apiGet('/api/members/me')
+}
+
+/**
+ * 點了驗證信的連結：把網址上的 token 交給後端。不用登入；
+ * 如果這個瀏覽器剛好登入的就是同一個會員，順便更新畫面上的會員資料（提醒橫幅會消失）。
+ */
+export async function verifyEmail(token) {
+  const member = await apiPost('/api/auth/verify-email', { token })
+  updateMember(member)
+  console.info(`[Email 驗證] 驗證成功，會員 id=${member.id}`)
+  return member
+}
+
+/** 重寄驗證信（需要登入）；60 秒內重複要求，後端回 429 */
+export async function resendVerification() {
+  await apiPost('/api/members/me/email-verification')
+  console.info('[Email 驗證] 已重寄驗證信')
 }
