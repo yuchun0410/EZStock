@@ -30,6 +30,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -41,7 +42,7 @@ public class FinMindDataSource implements MarketDataSource {
 
     private static final Logger log = LoggerFactory.getLogger(FinMindDataSource.class);
 
-    /** 上市股票與 ETF 的代號格式：4 碼數字開頭，後面最多 2 碼數字或英文 */
+    /** 上市櫃股票與 ETF 的代號格式：4 碼數字開頭，後面最多 2 碼數字或英文 */
     private static final String LISTED_STOCK_ID = "\\d{4}[0-9A-Z]{0,2}";
 
     /** 美股代號：1～5 個英文字母；或 BRK/B 這種「代號/股別」，查價格時要寫成 BRK-B */
@@ -62,6 +63,9 @@ public class FinMindDataSource implements MarketDataSource {
     static final int NAME_MAX_LENGTH = 100;
 
     private static final Pattern ISO_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
+
+    /** 要放進清單的市場：twse 上市、tpex 上櫃。興櫃（emerging）交易量小、價格資料不完整，不收 */
+    private static final Set<String> LISTED_MARKETS = Set.of("twse", "tpex");
 
     private final RestClient restClient;
     private final FinMindProperties properties;
@@ -90,8 +94,8 @@ public class FinMindDataSource implements MarketDataSource {
                 skipped++;
                 continue;
             }
-            // 第一版只做上市（twse）的股票與 ETF；代號是 4 碼數字開頭，例如 2330、0050、00878
-            if (!"twse".equals(row.type()) || !row.stockId().matches(LISTED_STOCK_ID)) {
+            // 上市（twse）與上櫃（tpex）的股票與 ETF；代號是 4 碼數字開頭，例如 2330、5483、0050、00878
+            if (!LISTED_MARKETS.contains(row.type()) || !row.stockId().matches(LISTED_STOCK_ID)) {
                 skipped++;
                 continue;
             }
@@ -99,7 +103,7 @@ public class FinMindDataSource implements MarketDataSource {
             infos.putIfAbsent(row.stockId(),
                     new StockInfo(row.stockId(), row.stockName(), type, row.industryCategory()));
         }
-        log.info("[FinMind] 股票清單共 {} 檔上市股票與 ETF（略過上櫃、興櫃、指數等 {} 筆）", infos.size(), skipped);
+        log.info("[FinMind] 股票清單共 {} 檔上市櫃股票與 ETF（略過興櫃、指數等 {} 筆）", infos.size(), skipped);
         return List.copyOf(infos.values());
     }
 
