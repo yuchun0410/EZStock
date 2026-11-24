@@ -7,10 +7,13 @@ public interface ImportService {
 
     /**
      * 匯入全部：
-     * 1. 股票清單（全部上市股票與 ETF）
+     * 1. 股票清單（全部上市櫃股票與 ETF）
      * 2. 設定檔指定股票的日線與股利（只新增還沒有的資料）
      */
     ImportResult importAll();
+
+    /** 只匯入台股清單（上市櫃股票與 ETF，不抓價格），回傳清單檔數；新增或改名的才會寫入資料庫 */
+    int importTwStockList();
 
     /** 只匯入美股清單（不抓價格；價格等使用者查詢時才按需載入），回傳清單檔數 */
     int importUsStockList();

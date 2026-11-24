@@ -123,6 +123,14 @@ public class ImportServiceImpl implements ImportService {
     }
 
     @Override
+    public int importTwStockList() {
+        long start = System.currentTimeMillis();
+        int count = importStockList(marketDataSource.fetchStockInfos(), "台股");
+        log.info("台股清單匯入完成：{} 檔，耗時 {} 秒", count, (System.currentTimeMillis() - start) / 1000);
+        return count;
+    }
+
+    @Override
     public int importUsStockList() {
         long start = System.currentTimeMillis();
         int count = importStockList(marketDataSource.fetchUsStockInfos(), "美股");

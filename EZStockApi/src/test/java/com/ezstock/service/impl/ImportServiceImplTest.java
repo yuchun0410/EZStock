@@ -287,6 +287,23 @@ class ImportServiceImplTest {
     }
 
     @Test
+    @DisplayName("台股清單更新：只寫入新增的股票（例如新加入的上櫃股），不抓價格、不碰美股")
+    void importTwStockListSavesNewStocks() {
+        when(dataSource.fetchStockInfos()).thenReturn(List.of(
+                new StockInfo("2330", "台積電", StockType.STOCK, "半導體業"),
+                new StockInfo("5483", "中美晶", StockType.STOCK, "半導體業")));
+        when(stockDao.findAll()).thenReturn(List.of(new Stock("2330", "台積電", StockType.STOCK, "半導體業")));
+
+        int count = createService(List.of()).importTwStockList();
+
+        assertThat(count).isEqualTo(2);
+        verify(stockDao).save(org.mockito.ArgumentMatchers.argThat(s -> s.getStockId().equals("5483")));
+        verify(stockDao, never()).save(org.mockito.ArgumentMatchers.argThat(s -> s.getStockId().equals("2330")));
+        verify(dataSource, never()).fetchUsStockInfos();
+        verify(dataSource, never()).fetchPrices(anyString(), any(), any());
+    }
+
+    @Test
     @DisplayName("美股匯入：用美股的還原價，不抓台股的股利、分割")
     void importUsStock() {
         usStock("AAPL");

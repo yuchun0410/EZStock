@@ -9,7 +9,7 @@ import java.util.List;
  */
 public interface MarketDataSource {
 
-    /** 台股清單（代號、名稱、類型、產業） */
+    /** 台股清單：上市、上櫃的股票與 ETF（代號、名稱、類型、產業） */
     List<StockInfo> fetchStockInfos();
 
     /** 某檔台股某段期間的日線（原始價格，除權息另外用股利、分割資料處理） */
